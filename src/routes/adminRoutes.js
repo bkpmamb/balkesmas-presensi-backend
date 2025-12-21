@@ -26,6 +26,6 @@ router.delete("/employees/:id", protect, adminOnly, deleteEmployee);
 router.put("/employees/:id/reset-password", protect, adminOnly, resetPassword);
 router.get("/report", protect, adminOnly, getAttendanceReport);
 router.get("/export", protect, adminOnly, exportAttendance);
-router.get("/attendance/today", protect, admin, getTodayAttendance);
+router.get("/attendance/today", protect, adminOnly, getTodayAttendance);
 
 export default router;

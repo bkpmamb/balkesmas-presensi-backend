@@ -11,31 +11,39 @@ import adminRoutes from "./routes/adminRoutes.js";
 dotenv.config();
 const app = express();
 
-//Middleware
-
-app.use(cors());
-app.use(express.json({ limit: "10mb" }));
-app.use(express.urlencoded({ extended: true }));
-app.use("/api/auth", authRoutes);
-app.use("/api/attendance", attendanceRoutes);
-app.use("/api/admin", adminRoutes);
-
+// 1. Koneksi Database (Optimasi untuk Serverless)
 const connectDB = async () => {
+  if (mongoose.connection.readyState >= 1) return; // Jika sudah konek, lewati
   try {
-    const conn = await mongoose.connect(process.env.MONGO_URI);
-    console.log(`MongoDB Connected: ${conn.connection.host}`);
+    await mongoose.connect(process.env.MONGO_URI);
+    console.log("MongoDB Connected");
   } catch (error) {
-    console.log(`Error : ${error.message}`);
-    process.exit(1);
+    console.error(`Error: ${error.message}`);
+    // Jangan gunakan process.exit(1) di serverless agar tidak mematikan instance
   }
 };
 
-connectDB();
+// Middleware untuk memastikan DB terkoneksi di setiap request (opsional tapi aman di Vercel)
+app.use(async (req, res, next) => {
+  await connectDB();
+  next();
+});
+
+// Middleware Standar
+app.use(cors());
+app.use(express.json({ limit: "10mb" }));
+app.use(express.urlencoded({ extended: true }));
+
+// Routes
+app.use("/api/auth", authRoutes);
+app.use("/api/attendance", attendanceRoutes);
+app.use("/api/admin", adminRoutes);
 
 app.get("/", (req, res) => {
   res.send("Balkesmas API is running ...");
 });
 
+// Error Handling
 app.use((err, req, res, next) => {
   const statusCode = res.statusCode === 200 ? 500 : res.statusCode;
   res.status(statusCode).json({
@@ -44,8 +52,4 @@ app.use((err, req, res, next) => {
   });
 });
 
-const PORT = process.env.PORT || 5001;
-
-app.listen(PORT, () => {
-  console.log(`Server running in ${process.env.NODE_ENV} mode on port ${PORT}`);
-});
+export default app;

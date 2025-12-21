@@ -189,3 +189,35 @@ export const getAttendanceHistory = async (req, res) => {
     res.status(500).json({ message: error.message });
   }
 };
+
+export const getTodayAttendance = async (req, res) => {
+  try {
+    // 1. Tentukan rentang waktu hari ini (Start: 00:00, End: 23:59)
+    const startOfDay = new Date();
+    startOfDay.setHours(0, 0, 0, 0);
+
+    const endOfDay = new Date();
+    endOfDay.setHours(23, 59, 59, 999);
+
+    // 2. Query ke MongoDB
+    // Asumsi: Anda memiliki field 'createdAt' atau 'checkIn' di model Attendance
+    const todayAttendance = await Attendance.find({
+      checkIn: {
+        $gte: startOfDay,
+        $lte: endOfDay,
+      },
+    }).sort({ checkIn: -1 }); // Urutkan dari yang terbaru
+
+    res.status(200).json({
+      success: true,
+      count: todayAttendance.length,
+      data: todayAttendance,
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      message: "Gagal mengambil data presensi hari ini",
+      error: error.message,
+    });
+  }
+};

@@ -13,6 +13,7 @@ import {
   exportAttendance,
 } from "../controllers/adminController.js";
 import { protect, adminOnly } from "../middleware/authMiddleware.js";
+import { getTodayAttendance } from "../controllers/attendanceController.js";
 
 const router = express.Router();
 
@@ -25,5 +26,6 @@ router.delete("/employees/:id", protect, adminOnly, deleteEmployee);
 router.put("/employees/:id/reset-password", protect, adminOnly, resetPassword);
 router.get("/report", protect, adminOnly, getAttendanceReport);
 router.get("/export", protect, adminOnly, exportAttendance);
+router.get("/attendance/today", protect, admin, getTodayAttendance);
 
 export default router;

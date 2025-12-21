@@ -43,20 +43,48 @@ export const getAllAttendance = async (req, res) => {
 
 export const getAdminStats = async (req, res) => {
   try {
+    // 1. Hitung Total Karyawan
     const totalKaryawan = await User.countDocuments({ role: "employee" });
+
+    // 2. Setup Rentang Waktu Hari Ini (WIB/Lokal)
+    const startOfDay = new Date();
+    startOfDay.setHours(0, 0, 0, 0);
+
+    const endOfDay = new Date();
+    endOfDay.setHours(23, 59, 59, 999);
+
+    // 3. Hitung Hadir Hari Ini
     const hadirHariIni = await Attendance.countDocuments({
-      clockIn: { $gte: new Date().setHours(0, 0, 0, 0) },
+      clockIn: { $gte: startOfDay, $lte: endOfDay },
     });
 
+    // 4. Hitung Terlambat Hari Ini
+    const terlambatHariIni = await Attendance.countDocuments({
+      clockIn: { $gte: startOfDay, $lte: endOfDay },
+      status: "Terlambat", // Pastikan string "Terlambat" sesuai dengan di DB Anda
+    });
+
+    // 5. Hitung Persentase Kehadiran
+    const persentase =
+      totalKaryawan > 0
+        ? `${((hadirHariIni / totalKaryawan) * 100).toFixed(2)}%`
+        : "0.00%";
+
+    // 6. Kirim Response (Dibungkus properti 'data' agar sinkron dengan Frontend)
     res.status(200).json({
-      totalKaryawan,
-      hadirHariIni,
-      persentaseKehadiran: `${((hadirHariIni / totalKaryawan) * 100).toFixed(
-        2
-      )}%`,
+      success: true,
+      data: {
+        totalKaryawan,
+        hadirHariIni,
+        terlambatHariIni,
+        persentaseKehadiran: persentase,
+      },
     });
   } catch (error) {
-    res.status(500).json({ message: error.message });
+    res.status(500).json({
+      success: false,
+      message: error.message,
+    });
   }
 };
 

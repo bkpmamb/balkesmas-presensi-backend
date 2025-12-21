@@ -1,7 +1,6 @@
 import Attendance from "../models/Attendance.js";
 import Shift from "../models/Shift.js";
 import { uploadToS3 } from "../utils/s3Upload.js";
-import { formatInTimeZone } from "date-fns-tz";
 import { startOfDay, endOfDay } from "date-fns";
 
 const getDistance = (lat1, lon1, lat2, lon2) => {

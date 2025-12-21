@@ -10,7 +10,8 @@ const attendanceSchema = new mongoose.Schema(
       type: { type: String, default: "Point" },
       coordinates: { type: [Number], required: true }, // [longitude, latitude]
     },
-    photoUrl: { type: String, required: true }, // URL dari S3
+    photoUrl: { type: String, required: true },
+    photoOutUrl: { type: String }, // URL dari S3
     status: {
       type: String,
       enum: ["ontime", "late"],

@@ -1,8 +1,12 @@
+// src/server.js
+
 import express from "express";
 import mongoose from "mongoose";
 import dotenv from "dotenv";
 import cors from "cors";
 import authRoutes from "./routes/authRoutes.js";
+import attendanceRoutes from "./routes/attendanceRoutes.js";
+import adminRoutes from "./routes/adminRoutes.js";
 
 dotenv.config();
 const app = express();
@@ -13,6 +17,8 @@ app.use(cors());
 app.use(express.json({ limit: "10mb" }));
 app.use(express.urlencoded({ extended: true }));
 app.use("/api/auth", authRoutes);
+app.use("/api/attendance", attendanceRoutes);
+app.use("/api/admin", adminRoutes);
 
 const connectDB = async () => {
   try {

@@ -1,7 +1,9 @@
+// src/middleware/authMiddleware.js
+
 import jwt from "jsonwebtoken";
 import User from "../models/User.js";
 
-export const portect = async (req, res, next) => {
+export const protect = async (req, res, next) => {
   let token;
 
   if (
@@ -35,5 +37,13 @@ export const adminOnly = (req, res, next) => {
     next();
   } else {
     res.status(403).json({ message: "Hanya Admin yang diizinkan" });
+  }
+};
+
+export const admin = (req, res, next) => {
+  if (req.user && req.user.role === "admin") {
+    next();
+  } else {
+    res.status(403).json({ message: "Akses ditolak, hanya untuk Admin" });
   }
 };

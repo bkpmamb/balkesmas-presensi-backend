@@ -1,6 +1,8 @@
 import Attendance from "../models/Attendance.js";
 import Shift from "../models/Shift.js";
 import { uploadToS3 } from "../utils/s3Upload.js";
+import { formatInTimeZone } from "date-fns-tz";
+import { startOfDay, endOfDay } from "date-fns";
 
 const getDistance = (lat1, lon1, lat2, lon2) => {
   const R = 6371e3;
@@ -192,31 +194,35 @@ export const getAttendanceHistory = async (req, res) => {
 
 export const getTodayAttendance = async (req, res) => {
   try {
-    // 1. Tentukan rentang waktu hari ini (Start: 00:00, End: 23:59)
-    const startOfDay = new Date();
-    startOfDay.setHours(0, 0, 0, 0);
+    const timeZone = "Asia/Jakarta";
 
-    const endOfDay = new Date();
-    endOfDay.setHours(23, 59, 59, 999);
+    // 1. Dapatkan waktu sekarang di Jakarta
+    const nowInJakarta = new Date(
+      new Intl.DateTimeFormat("en-US", { timeZone }).format(new Date())
+    );
 
-    // 2. Query ke MongoDB
-    // Asumsi: Anda memiliki field 'createdAt' atau 'checkIn' di model Attendance
+    // 2. Tentukan awal dan akhir hari berdasarkan waktu Jakarta
+    const start = startOfDay(nowInJakarta);
+    const end = endOfDay(nowInJakarta);
+
+    // 3. Query ke MongoDB
     const todayAttendance = await Attendance.find({
       checkIn: {
-        $gte: startOfDay,
-        $lte: endOfDay,
+        $gte: start,
+        $lte: end,
       },
-    }).sort({ checkIn: -1 }); // Urutkan dari yang terbaru
+    })
+      .populate("user", "name employeeId category") // Opsional: jika ingin ambil detail user dari collection users
+      .sort({ checkIn: -1 });
 
     res.status(200).json({
       success: true,
-      count: todayAttendance.length,
       data: todayAttendance,
     });
   } catch (error) {
     res.status(500).json({
       success: false,
-      message: "Gagal mengambil data presensi hari ini",
+      message: "Gagal mengambil data presensi",
       error: error.message,
     });
   }

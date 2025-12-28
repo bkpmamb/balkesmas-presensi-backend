@@ -4,7 +4,7 @@ import bcrypt from "bcryptjs";
 
 // @desc    Register user baru
 // @route   POST /api/auth/register
-// @access  Private (Admin only - nanti diatur di middleware)
+// @access  Private (Admin only)
 export const registerUser = async (req, res) => {
   const { name, username, password, role, category, employeeId } = req.body;
 

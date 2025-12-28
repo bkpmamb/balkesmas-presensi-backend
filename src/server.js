@@ -11,6 +11,8 @@ import adminRoutes from "./routes/adminRoutes.js";
 dotenv.config();
 const app = express();
 
+const PORT = process.env.PORT || 5001;
+
 // 1. Koneksi Database (Optimasi untuk Serverless)
 const connectDB = async () => {
   if (mongoose.connection.readyState >= 1) return; // Jika sudah konek, lewati
@@ -50,6 +52,14 @@ app.use((err, req, res, next) => {
     message: err.message,
     stack: process.env.NODE_ENV === "production" ? null : err.stack,
   });
+});
+
+app.listen(PORT, () => {
+  console.log(
+    `Server running in ${process.env.NODE_ENV || "development"} mode`
+  );
+  console.log(`Connected on Port: ${PORT}`);
+  console.log(`URL: http://localhost:${PORT}`);
 });
 
 export default app;

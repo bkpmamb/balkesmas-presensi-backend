@@ -132,47 +132,67 @@ export const getAllEmployees = async (req, res) => {
   }
 };
 
+// export const createEmployee = async (req, res) => {
+//   try {
+//     const { name, username, password, employeeId, category } = req.body;
+
+//     // Cek apakah username sudah digunakan
+//     const userExists = await User.findOne({ username });
+//     if (userExists) {
+//       return res.status(400).json({ message: "Username sudah digunakan" });
+//     }
+
+//     // Hash password secara manual (jika belum ada logic pre-save di model)
+//     const salt = await bcrypt.genSalt(10);
+//     const hashedPassword = await bcrypt.hash(password, salt);
+
+//     // Simpan ke database
+//     const newUser = await User.create({
+//       name,
+//       username,
+//       password: hashedPassword,
+//       employeeId,
+//       category, // Harus salah satu dari: Satpam, Apoteker, Cleaning Service, Staff
+//       role: "employee",
+//     });
+
+//     res.status(201).json({
+//       message: "Karyawan berhasil didaftarkan",
+//       data: {
+//         id: newUser._id,
+//         username: newUser.username,
+//         category: newUser.category,
+//       },
+//     });
+//   } catch (error) {
+//     // Menangkap error jika kategori tidak sesuai ENUM
+//     if (error.name === "ValidationError") {
+//       return res.status(400).json({
+//         message:
+//           "Kategori tidak valid. Pilih antara: Satpam, Apoteker, Cleaning Service, atau Staff",
+//       });
+//     }
+//     res.status(500).json({ message: error.message });
+//   }
+// };
+
 export const createEmployee = async (req, res) => {
   try {
     const { name, username, password, employeeId, category } = req.body;
 
-    // Cek apakah username sudah digunakan
-    const userExists = await User.findOne({ username });
-    if (userExists) {
-      return res.status(400).json({ message: "Username sudah digunakan" });
-    }
-
-    // Hash password secara manual (jika belum ada logic pre-save di model)
-    const salt = await bcrypt.genSalt(10);
-    const hashedPassword = await bcrypt.hash(password, salt);
-
-    // Simpan ke database
+    // Langsung create! Mongoose akan otomatis nge-hash password-nya
     const newUser = await User.create({
       name,
       username,
-      password: hashedPassword,
+      password,
       employeeId,
-      category, // Harus salah satu dari: Satpam, Apoteker, Cleaning Service, Staff
+      category,
       role: "employee",
     });
 
-    res.status(201).json({
-      message: "Karyawan berhasil didaftarkan",
-      data: {
-        id: newUser._id,
-        username: newUser.username,
-        category: newUser.category,
-      },
-    });
+    res.status(201).json({ success: true, data: newUser });
   } catch (error) {
-    // Menangkap error jika kategori tidak sesuai ENUM
-    if (error.name === "ValidationError") {
-      return res.status(400).json({
-        message:
-          "Kategori tidak valid. Pilih antara: Satpam, Apoteker, Cleaning Service, atau Staff",
-      });
-    }
-    res.status(500).json({ message: error.message });
+    res.status(400).json({ message: error.message });
   }
 };
 
@@ -264,40 +284,57 @@ export const resetPassword = async (req, res) => {
 
 export const getAttendanceReport = async (req, res) => {
   try {
-    const { startDate, endDate, category, name } = req.query;
-    let query = {};
+    const { startDate, endDate } = req.query;
 
-    // Filter berdasarkan Rentang Tanggal
-    if (startDate && endDate) {
-      query.clockIn = {
-        $gte: new Date(new Date(startDate).setHours(0, 0, 0, 0)),
-        $lte: new Date(new Date(endDate).setHours(23, 59, 59, 999)),
-      };
+    // 1. Validasi input tanggal
+    if (!startDate || !endDate) {
+      return res.status(400).json({
+        success: false,
+        message: "Silakan tentukan rentang tanggal (startDate & endDate)",
+      });
     }
 
-    // Filter berdasarkan Kategori (Satpam, Staff, dll)
-    // Karena kategori ada di model User, kita perlu cari ID usernya dulu
-    let userFilter = {};
-    if (category) userFilter.category = category;
-    if (name) userFilter.name = new RegExp(name, "i"); // Case-insensitive search
+    // 2. Format tanggal (Menangani awal dan akhir hari dengan presisi)
+    const start = new Date(startDate);
+    start.setHours(0, 0, 0, 0);
 
-    const users = await User.find(userFilter).select("_id");
-    const userIds = users.map((u) => u._id);
+    const end = new Date(endDate);
+    end.setHours(23, 59, 59, 999);
 
-    query.user = { $in: userIds };
-
-    const report = await Attendance.find(query)
-      .populate("user", "name employeeId category")
-      .populate("shift", "name")
+    // 3. Query ke database dengan Populate
+    const attendances = await Attendance.find({
+      clockIn: {
+        $gte: start,
+        $lte: end,
+      },
+    })
+      .populate("user", "name employeeId category") // Mengambil data user terkait
       .sort({ clockIn: -1 });
 
+    // 4. Transformasi Data (Penting agar Frontend mudah membacanya)
+    const reportData = attendances.map((item) => ({
+      _id: item._id,
+      // Mengambil nama dari populate, jika user dihapus pakai fallback "N/A"
+      employeeName: item.user?.name || "Karyawan Dihapus",
+      employeeId: item.user?.employeeId || "-",
+      category: item.user?.category || "-",
+      clockIn: item.clockIn,
+      clockOut: item.clockOut || null,
+      status: item.status,
+      location: item.location || "Lokasi tidak ada",
+    }));
+
+    // 5. Kirim Response
     res.status(200).json({
-      message: "Laporan berhasil ditarik",
-      count: report.length,
-      data: report,
+      success: true,
+      count: reportData.length,
+      data: reportData,
     });
   } catch (error) {
-    res.status(500).json({ message: error.message });
+    res.status(500).json({
+      success: false,
+      message: "Gagal mengambil laporan: " + error.message,
+    });
   }
 };
 

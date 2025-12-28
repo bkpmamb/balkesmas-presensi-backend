@@ -1,21 +1,7 @@
 import Attendance from "../models/Attendance.js";
 import Shift from "../models/Shift.js";
 import { uploadToS3 } from "../utils/s3Upload.js";
-import { startOfDay, endOfDay } from "date-fns";
 import { validateDistance } from "../utils/geoUtils.js";
-
-const getDistance = (lat1, lon1, lat2, lon2) => {
-  const R = 6371e3;
-  const φ1 = (lat1 * Math.PI) / 180;
-  const φ2 = (lat2 * Math.PI) / 180;
-  const Δφ = ((lat2 - lat1) * Math.PI) / 180;
-  const Δλ = ((lon2 - lon1) * Math.PI) / 180;
-  const a =
-    Math.sin(Δφ / 2) * Math.sin(Δφ / 2) +
-    Math.cos(φ1) * Math.cos(φ2) * Math.sin(Δλ / 2) * Math.sin(Δλ / 2);
-  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-  return R * c;
-};
 
 export const clockIn = async (req, res) => {
   try {
@@ -42,7 +28,12 @@ export const clockIn = async (req, res) => {
     // Cari semua shift berdasarkan kategori user (Staff/Satpam/Apoteker)
     const availableShifts = await Shift.find({ category: req.user.category });
 
-    // Logika sederhana: cari shift yang jam mulainya paling dekat dengan jam sekarang
+    if (!availableShifts || availableShifts.length === 0) {
+      return res
+        .status(404)
+        .json({ message: "Data shift untuk kategori Anda tidak ditemukan." });
+    }
+
     let assignedShift = availableShifts[0];
     let minDiff = 24;
 
@@ -193,32 +184,41 @@ export const getTodayAttendance = async (req, res) => {
     const timeZone = "Asia/Jakarta";
 
     // 1. Dapatkan waktu sekarang di Jakarta
-    const nowInJakarta = new Date(
-      new Intl.DateTimeFormat("en-US", { timeZone }).format(new Date())
-    );
+    const now = new Date();
+    const jakartaTime = new Intl.DateTimeFormat("en-US", {
+      timeZone,
+      year: "numeric",
+      month: "numeric",
+      day: "numeric",
+    }).format(now);
 
-    // 2. Tentukan awal dan akhir hari berdasarkan waktu Jakarta
-    const start = startOfDay(nowInJakarta);
-    const end = endOfDay(nowInJakarta);
+    // 2. Tentukan awal dan akhir hari (00:00:00 sampai 23:59:59)
+    const start = new Date(jakartaTime);
+    start.setHours(0, 0, 0, 0);
+
+    const end = new Date(jakartaTime);
+    end.setHours(23, 59, 59, 999);
 
     // 3. Query ke MongoDB
-    const todayAttendance = await Attendance.find({
-      checkIn: {
+    // Tambahkan filter 'user: req.user._id' agar hanya mengambil data milik user ybs
+    const todayAttendance = await Attendance.findOne({
+      user: req.user._id, // Filter berdasarkan user yang login
+      clockIn: {
         $gte: start,
         $lte: end,
       },
     })
-      .populate("user", "name employeeId category") // Opsional: jika ingin ambil detail user dari collection users
-      .sort({ checkIn: -1 });
+      .populate("shift", "name startTime endTime")
+      .sort({ clockIn: -1 });
 
     res.status(200).json({
       success: true,
-      data: todayAttendance,
+      data: todayAttendance, // Menggunakan findOne karena 1 user biasanya 1 absen per hari
     });
   } catch (error) {
     res.status(500).json({
       success: false,
-      message: "Gagal mengambil data presensi",
+      message: "Gagal mengambil data presensi hari ini",
       error: error.message,
     });
   }

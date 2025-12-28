@@ -2,6 +2,7 @@ import Attendance from "../models/Attendance.js";
 import Shift from "../models/Shift.js";
 import { uploadToS3 } from "../utils/s3Upload.js";
 import { startOfDay, endOfDay } from "date-fns";
+import { validateDistance } from "../utils/geoUtils.js";
 
 const getDistance = (lat1, lon1, lat2, lon2) => {
   const R = 6371e3;
@@ -25,14 +26,12 @@ export const clockIn = async (req, res) => {
       return res.status(400).json({ message: "Lokasi dan foto wajib diisi" });
     }
 
-    // 1. Validasi Geo-fencing (100 meter)
-    const officeLat = -7.0051;
-    const officeLong = 110.4381;
-    const distance = getDistance(latitude, longitude, officeLat, officeLong);
+    const geo = validateDistance(parseFloat(latitude), parseFloat(longitude));
 
-    if (distance > 100) {
+    if (!geo.isWithinRange) {
       return res.status(403).json({
-        message: `Anda di luar area kantor (${Math.round(distance)}m)`,
+        success: false,
+        message: `Akses ditolak. Anda berada ${geo.distance}m dari kantor (Batas 100m).`,
       });
     }
 
@@ -110,14 +109,12 @@ export const clockOut = async (req, res) => {
         .json({ message: "Lokasi dan foto pulang wajib diisi" });
     }
 
-    // 1. Validasi Geo-fencing
-    const officeLat = -7.0051;
-    const officeLong = 110.4381;
-    const distance = getDistance(latitude, longitude, officeLat, officeLong);
+    const geo = validateDistance(parseFloat(latitude), parseFloat(longitude));
 
-    if (distance > 100) {
+    if (!geo.isWithinRange) {
       return res.status(403).json({
-        message: `Anda di luar area kantor (${Math.round(distance)}m)`,
+        success: false,
+        message: `Akses ditolak. Anda berada ${geo.distance}m dari kantor (Batas 100m).`,
       });
     }
 

@@ -1,3 +1,5 @@
+// src/config/s3Config.js
+
 import { S3Client } from "@aws-sdk/client-s3";
 import dotenv from "dotenv";
 

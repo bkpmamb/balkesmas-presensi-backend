@@ -17,15 +17,23 @@ import { getTodayAttendance } from "../controllers/attendanceController.js";
 
 const router = express.Router();
 
-router.get("/all-attendance", protect, adminOnly, getAllAttendance);
-router.get("/stats", protect, adminOnly, getAdminStats);
-router.get("/employees", protect, adminOnly, getAllEmployees);
-router.post("/employees", protect, adminOnly, createEmployee);
-router.put("/employees/:id", protect, adminOnly, updateEmployee);
-router.delete("/employees/:id", protect, adminOnly, deleteEmployee);
-router.put("/employees/:id/reset-password", protect, adminOnly, resetPassword);
-router.get("/report", protect, adminOnly, getAttendanceReport);
-router.get("/export", protect, adminOnly, exportAttendance);
-router.get("/attendance/today", protect, adminOnly, getTodayAttendance);
+// Apply middleware ke semua route
+router.use(protect, adminOnly);
+
+// ===== ATTENDANCE ROUTES =====
+router.get("/all-attendance", getAllAttendance);
+router.get("/attendance/today", getTodayAttendance);
+router.get("/report", getAttendanceReport);
+router.get("/export", exportAttendance);
+
+// ===== STATS & DASHBOARD =====
+router.get("/stats", getAdminStats);
+
+// ===== EMPLOYEE MANAGEMENT =====
+router.get("/employees", getAllEmployees);
+router.post("/employees", createEmployee);
+router.put("/employees/:id", updateEmployee);
+router.delete("/employees/:id", deleteEmployee);
+router.put("/employees/:id/reset-password", resetPassword);
 
 export default router;

@@ -178,21 +178,79 @@ export const getAllEmployees = async (req, res) => {
 
 export const createEmployee = async (req, res) => {
   try {
-    const { name, username, password, employeeId, category } = req.body;
+    const { name, username, password, category, phone } = req.body;
 
-    // Langsung create! Mongoose akan otomatis nge-hash password-nya
+    // Validasi input
+    if (!name || !username || !password || !category) {
+      return res.status(400).json({
+        success: false,
+        message: "Nama, username, password, dan kategori wajib diisi",
+      });
+    }
+
+    // Cek username sudah ada
+    const userExists = await User.findOne({ username: username.toLowerCase() });
+    if (userExists) {
+      return res.status(400).json({
+        success: false,
+        message: `Username "${username}" sudah digunakan`,
+      });
+    }
+
+    // Validasi category exists
+    const categoryExists = await Category.findById(category);
+    if (!categoryExists) {
+      return res.status(404).json({
+        success: false,
+        message: "Kategori tidak ditemukan",
+      });
+    }
+
+    // ✅ AUTO-GENERATE EMPLOYEE ID (KITA IMPLEMENT INI NANTI)
+    // Sementara biarkan null dulu
+
+    // Create user - password akan di-hash otomatis oleh pre-save hook
     const newUser = await User.create({
-      name,
-      username,
-      password,
-      employeeId,
+      name: name.trim(),
+      username: username.toLowerCase().trim(),
+      password, // ✅ Jangan hash manual! Biar pre-save hook yang handle
       category,
+      phone: phone?.trim(),
       role: "employee",
+      isActive: true,
     });
 
-    res.status(201).json({ success: true, data: newUser });
+    // Populate category untuk response
+    await newUser.populate("category", "name prefix");
+
+    res.status(201).json({
+      success: true,
+      message: "Karyawan berhasil ditambahkan",
+      data: {
+        _id: newUser._id,
+        name: newUser.name,
+        username: newUser.username,
+        employeeId: newUser.employeeId, // Null dulu, nanti kita auto-generate
+        category: newUser.category,
+        role: newUser.role,
+        isActive: newUser.isActive,
+        createdAt: newUser.createdAt,
+      },
+    });
   } catch (error) {
-    res.status(400).json({ message: error.message });
+    // Handle duplicate key error (username)
+    if (error.code === 11000) {
+      return res.status(400).json({
+        success: false,
+        message: "Username sudah digunakan",
+      });
+    }
+
+    res.status(500).json({
+      success: false,
+      message: "Gagal menambahkan karyawan",
+      error: error.message,
+    });
   }
 };
 

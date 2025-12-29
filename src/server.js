@@ -170,24 +170,31 @@ app.use((req, res) => {
 // ===== START SERVER =====
 const startServer = async () => {
   try {
-    // Connect ke database dulu sebelum start server
     await connectDB();
 
-    app.listen(PORT, () => {
-      console.log("\n🚀 ================================");
-      console.log(
-        `   Server running in ${process.env.NODE_ENV || "development"} mode`
-      );
-      console.log(`   Port: ${PORT}`);
-      console.log(`   URL: http://localhost:${PORT}`);
-      console.log("🚀 ================================\n");
-    });
+    // Jika BUKAN di Vercel, start server normal
+    if (process.env.NODE_ENV !== "production" || !process.env.VERCEL) {
+      app.listen(PORT, () => {
+        console.log("\n🚀 ================================");
+        console.log(
+          `   Server running in ${process.env.NODE_ENV || "development"} mode`
+        );
+        console.log(`   Port: ${PORT}`);
+        console.log(`   URL: http://localhost:${PORT}`);
+        console.log("🚀 ================================\n");
+      });
+    }
   } catch (error) {
     console.error("💥 Failed to start server:", error.message);
-    process.exit(1);
+    if (process.env.NODE_ENV !== "production") {
+      process.exit(1);
+    }
   }
 };
 
-startServer();
+// Jika BUKAN di Vercel, start server
+if (!process.env.VERCEL) {
+  startServer();
+}
 
 export default app;

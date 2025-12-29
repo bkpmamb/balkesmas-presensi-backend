@@ -50,13 +50,18 @@ userSchema.index({ category: 1 });
 
 // Hash password sebelum save
 userSchema.pre("save", async function (next) {
+  // Jika password tidak diubah, skip hashing
   if (!this.isModified("password")) {
-    return next();
+    return next(); // ✅ RETURN next() agar tidak lanjut ke bawah
   }
 
-  const salt = await bcrypt.genSalt(10);
-  this.password = await bcrypt.hash(this.password, salt);
-  next();
+  try {
+    const salt = await bcrypt.genSalt(10);
+    this.password = await bcrypt.hash(this.password, salt);
+    next();
+  } catch (error) {
+    next(error);
+  }
 });
 
 // Method untuk compare password

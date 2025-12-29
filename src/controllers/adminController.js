@@ -2,6 +2,7 @@
 
 import Attendance from "../models/Attendance.js";
 import User from "../models/User.js";
+import Category from "../models/Category.js";
 import bcrypt from "bcryptjs";
 import { json2csv } from "json-2-csv";
 

@@ -5,6 +5,7 @@ import User from "../models/User.js";
 import Category from "../models/Category.js";
 import bcrypt from "bcryptjs";
 import { json2csv } from "json-2-csv";
+import { generateEmployeeId } from "../utils/generateEmployeeId.js";
 
 export const getAllAttendance = async (req, res) => {
   try {
@@ -199,23 +200,24 @@ export const createEmployee = async (req, res) => {
     }
 
     // Validasi category exists
-    const categoryExists = await Category.findById(category);
-    if (!categoryExists) {
+    const categoryData = await Category.findById(category);
+    if (!categoryData) {
       return res.status(404).json({
         success: false,
         message: "Kategori tidak ditemukan",
       });
     }
 
-    // ✅ AUTO-GENERATE EMPLOYEE ID (KITA IMPLEMENT INI NANTI)
-    // Sementara biarkan null dulu
+    // ✅ AUTO-GENERATE EMPLOYEE ID
+    const employeeId = await generateEmployeeId(category, categoryData.prefix);
 
     // Create user - password akan di-hash otomatis oleh pre-save hook
     const newUser = await User.create({
       name: name.trim(),
       username: username.toLowerCase().trim(),
-      password, // ✅ Jangan hash manual! Biar pre-save hook yang handle
+      password,
       category,
+      employeeId, // ✅ Auto-generated!
       phone: phone?.trim(),
       role: "employee",
       isActive: true,
@@ -231,20 +233,30 @@ export const createEmployee = async (req, res) => {
         _id: newUser._id,
         name: newUser.name,
         username: newUser.username,
-        employeeId: newUser.employeeId, // Null dulu, nanti kita auto-generate
+        employeeId: newUser.employeeId, // ✅ Sekarang ada isinya!
         category: newUser.category,
         role: newUser.role,
+        phone: newUser.phone,
         isActive: newUser.isActive,
         createdAt: newUser.createdAt,
       },
     });
   } catch (error) {
-    // Handle duplicate key error (username)
+    // Handle duplicate key error
     if (error.code === 11000) {
-      return res.status(400).json({
-        success: false,
-        message: "Username sudah digunakan",
-      });
+      // Cek field mana yang duplicate
+      if (error.keyPattern.username) {
+        return res.status(400).json({
+          success: false,
+          message: "Username sudah digunakan",
+        });
+      }
+      if (error.keyPattern.employeeId) {
+        return res.status(400).json({
+          success: false,
+          message: "Employee ID sudah digunakan (conflict). Coba lagi.",
+        });
+      }
     }
 
     res.status(500).json({

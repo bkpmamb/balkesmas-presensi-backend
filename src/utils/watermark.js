@@ -3,9 +3,9 @@
 import sharp from "sharp";
 
 /**
- * Add watermark to image
+ * Add watermark overlay to image
  * @param {Buffer} imageBuffer - Original image buffer
- * @param {Object} watermarkData - Data for watermark
+ * @param {Object} watermarkData - Watermark information
  * @returns {Promise<Buffer>} - Watermarked image buffer
  */
 export const addWatermark = async (imageBuffer, watermarkData) => {
@@ -18,12 +18,17 @@ export const addWatermark = async (imageBuffer, watermarkData) => {
       status, // "Clock In" or "Clock Out"
     } = watermarkData;
 
+    console.log("🎨 Adding watermark...");
+    console.log("Status:", status);
+    console.log("Employee:", employeeName, employeeId);
+
     // Format timestamp ke WIB
     const WIB_OFFSET = 7 * 60 * 60 * 1000;
     const dateWIB = new Date(new Date(timestamp).getTime() + WIB_OFFSET);
 
     const dateStr = dateWIB.toLocaleDateString("id-ID", {
-      day: "2-digit",
+      weekday: "long",
+      day: "numeric",
       month: "long",
       year: "numeric",
     });
@@ -35,107 +40,142 @@ export const addWatermark = async (imageBuffer, watermarkData) => {
       hour12: false,
     });
 
-    // Get image metadata
+    // Get original image metadata
     const image = sharp(imageBuffer);
     const metadata = await image.metadata();
     const { width, height } = metadata;
 
-    // Calculate font sizes based on image width
-    const titleFontSize = Math.floor(width / 25); // Responsive font size
-    const textFontSize = Math.floor(width / 35);
-    const smallFontSize = Math.floor(width / 45);
+    console.log("Image size:", width, "x", height);
 
-    // Create watermark text
-    const watermarkLines = [
-      `${status.toUpperCase()}`, // Title
-      ``,
-      `${employeeName} (${employeeId})`,
-      `${dateStr}`,
-      `${timeStr} WIB`,
-      `Lokasi: ${location.latitude.toFixed(6)}, ${location.longitude.toFixed(
-        6
-      )}`,
-    ];
+    // Calculate responsive font sizes
+    const titleFontSize = Math.max(Math.floor(width / 18), 32);
+    const textFontSize = Math.max(Math.floor(width / 26), 22);
+    const smallFontSize = Math.max(Math.floor(width / 35), 18);
 
-    // Build SVG watermark
-    const lineHeight = textFontSize + 8;
-    const padding = 20;
+    const lineHeight = textFontSize + 14;
+    const padding = 25;
+    const boxPadding = 20;
+
+    // Calculate box dimensions
+    const totalLines = 5.8;
+    const boxHeight = totalLines * lineHeight + boxPadding * 2;
     const boxWidth = width - padding * 2;
-    const boxHeight = watermarkLines.length * lineHeight + padding * 2;
+    const boxY = height - boxHeight - padding;
 
+    // ✅ Build SVG watermark overlay (WITHOUT EMOJIS)
     const svgWatermark = `
       <svg width="${width}" height="${height}">
-        <!-- Semi-transparent background box -->
+        <defs>
+          <!-- Gradient background -->
+          <linearGradient id="boxGradient" x1="0%" y1="0%" x2="0%" y2="100%">
+            <stop offset="0%" style="stop-color:rgb(0,0,0);stop-opacity:0.85" />
+            <stop offset="100%" style="stop-color:rgb(20,20,20);stop-opacity:0.90" />
+          </linearGradient>
+        </defs>
+        
+        <!-- Background box with gradient -->
         <rect 
           x="${padding}" 
-          y="${height - boxHeight - padding}" 
+          y="${boxY}" 
           width="${boxWidth}" 
           height="${boxHeight}" 
-          fill="rgba(0, 0, 0, 0.7)" 
-          rx="10"
+          fill="url(#boxGradient)"
+          stroke="#FFD700"
+          stroke-width="3"
+          rx="18"
         />
         
-        <!-- Title (Clock In/Out) -->
+        <!-- Status Title (CLOCK IN / CLOCK OUT) -->
         <text 
-          x="${padding + 15}" 
-          y="${height - boxHeight - padding + titleFontSize + 15}" 
-          font-family="Arial, sans-serif" 
+          x="${padding + boxPadding}" 
+          y="${boxY + boxPadding + titleFontSize}" 
+          font-family="Arial, Helvetica, sans-serif" 
           font-size="${titleFontSize}" 
           font-weight="bold" 
-          fill="#FFFFFF"
+          fill="#FFD700"
+          letter-spacing="3"
         >
-          ${watermarkLines[0]}
+          ${status.toUpperCase()}
         </text>
         
-        <!-- Employee Name & ID -->
+        <!-- Separator line -->
+        <line
+          x1="${padding + boxPadding}"
+          y1="${boxY + boxPadding + titleFontSize + 10}"
+          x2="${width - padding - boxPadding}"
+          y2="${boxY + boxPadding + titleFontSize + 10}"
+          stroke="#FFD700"
+          stroke-width="2"
+          opacity="0.5"
+        />
+        
+        <!-- Employee Name -->
         <text 
-          x="${padding + 15}" 
-          y="${height - boxHeight - padding + titleFontSize + lineHeight + 25}" 
-          font-family="Arial, sans-serif" 
+          x="${padding + boxPadding}" 
+          y="${boxY + boxPadding + titleFontSize + lineHeight * 1.3}" 
+          font-family="Arial, Helvetica, sans-serif" 
           font-size="${textFontSize}" 
           font-weight="bold" 
           fill="#FFFFFF"
         >
-          ${watermarkLines[2]}
+          ${employeeName}
         </text>
         
-        <!-- Date -->
+        <!-- Employee ID -->
         <text 
-          x="${padding + 15}" 
-          y="${
-            height - boxHeight - padding + titleFontSize + lineHeight * 2 + 25
-          }" 
-          font-family="Arial, sans-serif" 
-          font-size="${textFontSize}" 
-          fill="#E0E0E0"
-        >
-          ${watermarkLines[3]}
-        </text>
-        
-        <!-- Time -->
-        <text 
-          x="${padding + 15}" 
-          y="${
-            height - boxHeight - padding + titleFontSize + lineHeight * 3 + 25
-          }" 
-          font-family="Arial, sans-serif" 
-          font-size="${textFontSize}" 
-          fill="#E0E0E0"
-        >
-          ${watermarkLines[4]}
-        </text>
-        
-        <!-- Location -->
-        <text 
-          x="${padding + 15}" 
-          y="${
-            height - boxHeight - padding + titleFontSize + lineHeight * 4 + 25
-          }" 
-          font-family="Arial, sans-serif" 
+          x="${padding + boxPadding}" 
+          y="${boxY + boxPadding + titleFontSize + lineHeight * 2}" 
+          font-family="Arial, Helvetica, sans-serif" 
           font-size="${smallFontSize}" 
-          fill="#B0B0B0"
+          fill="#D0D0D0"
         >
-          ${watermarkLines[5]}
+          ID: ${employeeId}
+        </text>
+        
+        <!-- Date Label -->
+        <text 
+          x="${padding + boxPadding}" 
+          y="${boxY + boxPadding + titleFontSize + lineHeight * 2.9}" 
+          font-family="Arial, Helvetica, sans-serif" 
+          font-size="${smallFontSize}" 
+          font-weight="600"
+          fill="#90EE90"
+        >
+          TANGGAL:
+        </text>
+        
+        <!-- Date Value -->
+        <text 
+          x="${padding + boxPadding}" 
+          y="${boxY + boxPadding + titleFontSize + lineHeight * 3.5}" 
+          font-family="Arial, Helvetica, sans-serif" 
+          font-size="${textFontSize}" 
+          fill="#E8E8E8"
+        >
+          ${dateStr}
+        </text>
+        
+        <!-- Time Label + Value -->
+        <text 
+          x="${padding + boxPadding}" 
+          y="${boxY + boxPadding + titleFontSize + lineHeight * 4.3}" 
+          font-family="Arial, Helvetica, sans-serif" 
+          font-size="${textFontSize}" 
+          font-weight="bold"
+          fill="#90EE90"
+        >
+          JAM: ${timeStr} WIB
+        </text>
+        
+        <!-- Location (GPS Coordinates) -->
+        <text 
+          x="${padding + boxPadding}" 
+          y="${boxY + boxPadding + titleFontSize + lineHeight * 5.1}" 
+          font-family="Courier New, monospace" 
+          font-size="${smallFontSize}" 
+          fill="#A0A0A0"
+        >
+          GPS: ${location.latitude.toFixed(6)}, ${location.longitude.toFixed(6)}
         </text>
       </svg>
     `;
@@ -149,12 +189,16 @@ export const addWatermark = async (imageBuffer, watermarkData) => {
           left: 0,
         },
       ])
-      .jpeg({ quality: 90 }) // Output as JPEG with good quality
+      .jpeg({
+        quality: 92,
+        mozjpeg: true,
+      })
       .toBuffer();
 
+    console.log("✅ Watermark applied successfully");
     return watermarkedBuffer;
   } catch (error) {
-    console.error("Watermark Error:", error);
+    console.error("❌ Watermark Error:", error);
     throw new Error(`Failed to add watermark: ${error.message}`);
   }
 };

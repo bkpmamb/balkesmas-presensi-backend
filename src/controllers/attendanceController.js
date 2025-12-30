@@ -162,7 +162,7 @@ export const clockIn = async (req, res) => {
     if (!schedule || !schedule.shift) {
       return res.status(404).json({
         success: false,
-        message: `Anda tidak memiliki jadwal shift untuk hari ini (dayOfWeek: ${dayOfWeek}, day: ${dayNames[dayOfWeek]}). Hubungi admin untuk mengatur jadwal.`,
+        message: `${req.user.name}, Anda tidak memiliki jadwal shift untuk hari ini (${dayNames[dayOfWeek]}). Hubungi admin untuk mengatur jadwal.`, // ✅ Tambah nama & hapus dayOfWeek number
       });
     }
 
@@ -268,7 +268,7 @@ export const clockOut = async (req, res) => {
     if (!geoValidation.isWithinRange) {
       return res.status(403).json({
         success: false,
-        message: `Anda berada di luar area kantor (${geoValidation.distance}m dari kantor, batas ${geoValidation.radiusLimit}m)`,
+        message: `${req.user.name}, Anda berada di luar area kantor (${geoValidation.distance}m dari kantor, batas ${geoValidation.radiusLimit}m)`, // ✅ Tambah nama
       });
     }
 
@@ -285,8 +285,7 @@ export const clockOut = async (req, res) => {
     if (!attendance) {
       return res.status(404).json({
         success: false,
-        message:
-          "Data presensi masuk tidak ditemukan atau Anda sudah presensi pulang",
+        message: `${req.user.name}, data presensi masuk tidak ditemukan atau Anda sudah presensi pulang`,
       });
     }
 
@@ -334,8 +333,8 @@ export const clockOut = async (req, res) => {
       success: true,
       message:
         clockOutStatus === "early"
-          ? `Presensi pulang berhasil (pulang lebih awal ${earlyMinutes} menit)`
-          : "Presensi pulang berhasil",
+          ? `${req.user.name}, presensi pulang berhasil (pulang lebih awal ${earlyMinutes} menit)`
+          : `${req.user.name}, presensi pulang berhasil`,
       data: {
         _id: attendance._id,
         clockIn: attendance.clockIn,

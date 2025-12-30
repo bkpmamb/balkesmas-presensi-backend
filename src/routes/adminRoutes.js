@@ -11,6 +11,7 @@ import {
   resetPassword,
   getAttendanceReport,
   exportAttendance,
+  deleteAttendance,
 } from "../controllers/adminController.js";
 import { protect, adminOnly } from "../middleware/authMiddleware.js";
 import { getTodayAttendance } from "../controllers/attendanceController.js";
@@ -35,5 +36,7 @@ router.post("/employees", createEmployee);
 router.put("/employees/:id", updateEmployee);
 router.delete("/employees/:id", deleteEmployee);
 router.put("/employees/:id/reset-password", resetPassword);
+
+router.delete("/attendance/:id", protect, adminOnly, deleteAttendance);
 
 export default router;

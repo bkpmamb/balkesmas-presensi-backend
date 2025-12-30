@@ -473,3 +473,37 @@ export const exportAttendance = async (req, res) => {
     res.status(500).json({ message: error.message });
   }
 };
+
+export const deleteAttendance = async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    const attendance = await Attendance.findById(id);
+
+    if (!attendance) {
+      return res.status(404).json({
+        success: false,
+        message: "Data presensi tidak ditemukan",
+      });
+    }
+
+    await attendance.deleteOne();
+
+    res.status(200).json({
+      success: true,
+      message: "Data presensi berhasil dihapus",
+      data: {
+        _id: attendance._id,
+        user: attendance.user,
+        date: attendance.date,
+      },
+    });
+  } catch (error) {
+    console.error("Delete Attendance Error:", error);
+    res.status(500).json({
+      success: false,
+      message: "Gagal menghapus data presensi",
+      error: error.message,
+    });
+  }
+};

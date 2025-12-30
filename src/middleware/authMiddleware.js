@@ -14,12 +14,20 @@ export const protect = async (req, res, next) => {
       // Ambil token dari header "Bearer <token>"
       token = req.headers.authorization.split(" ")[1];
 
+      // ✅ DEBUG LOG
+      console.log("==========================================");
+      console.log("🔐 AUTH MIDDLEWARE DEBUG");
+      console.log("==========================================");
+      console.log("Token received:", token.substring(0, 50) + "...");
+
       // Verifikasi token
       const decoded = jwt.verify(token, process.env.JWT_SECRET);
 
       // Ambil data user dari DB (tanpa password) dan masukkan ke req.user
       req.user = await User.findById(decoded.id).select("-password");
-
+      console.log("User loaded:", req.user.name);
+      console.log("User role:", req.user.role);
+      console.log("==========================================");
       next();
     } catch (error) {
       console.error(error);

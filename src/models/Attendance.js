@@ -31,7 +31,7 @@ const attendanceSchema = new mongoose.Schema(
       coordinates: { type: [Number], required: true }, // [longitude, latitude]
     },
     clockOutLocation: {
-      type: { type: String, default: "Point" },
+      type: { type: String, enum: "Point" },
       coordinates: { type: [Number] }, // [longitude, latitude]
     },
     photoUrl: {
@@ -81,7 +81,7 @@ const attendanceSchema = new mongoose.Schema(
 
 // Index untuk Geolocation
 attendanceSchema.index({ clockInLocation: "2dsphere" });
-attendanceSchema.index({ clockOutLocation: "2dsphere" });
+attendanceSchema.index({ clockOutLocation: "2dsphere" }, { sparse: true });
 
 // Compound Index untuk performa query
 attendanceSchema.index({ user: 1, date: -1 });

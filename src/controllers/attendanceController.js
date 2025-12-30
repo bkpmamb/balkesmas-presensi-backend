@@ -156,7 +156,20 @@ export const clockIn = async (req, res) => {
       console.log("✅ ON TIME");
     }
 
-    const photoUrl = await uploadToS3(file);
+    const watermarkData = {
+      employeeName: req.user.name,
+      employeeId: req.user.employeeId,
+      timestamp: nowUTC.toISOString(),
+      location: {
+        latitude: parseFloat(latitude),
+        longitude: parseFloat(longitude),
+      },
+      status: "Clock In",
+    };
+
+    console.log("Uploading photo with watermark...");
+    const photoUrl = await uploadToS3(file, watermarkData);
+    console.log("Photo uploaded with watermark:", photoUrl);
 
     // ✅ Simpan date dalam WIB (00:00:00)
     const dateOnlyWIB = new Date(nowWIB);
@@ -271,7 +284,7 @@ export const clockOut = async (req, res) => {
     console.log("Clock In:", attendance.clockIn);
 
     // 4. Upload foto pulang
-    const photoOutUrl = await uploadToS3(file);
+    // const photoOutUrl = await uploadToS3(file);
 
     // 5. Hitung status clock out berdasarkan WIB
     const shift = attendance.shift;
@@ -302,7 +315,28 @@ export const clockOut = async (req, res) => {
     const workHours = Math.floor(workMinutes / 60);
     const remainingMinutes = workMinutes % 60;
 
-    console.log("Work Duration:", workHours, "hours", remainingMinutes, "minutes");
+    console.log(
+      "Work Duration:",
+      workHours,
+      "hours",
+      remainingMinutes,
+      "minutes"
+    );
+
+    const watermarkData = {
+      employeeName: req.user.name,
+      employeeId: req.user.employeeId,
+      timestamp: nowUTC.toISOString(),
+      location: {
+        latitude: parseFloat(latitude),
+        longitude: parseFloat(longitude),
+      },
+      status: "Clock Out",
+    };
+
+    console.log("Uploading photo with watermark...");
+    const photoOutUrl = await uploadToS3(file, watermarkData);
+    console.log("Photo uploaded with watermark:", photoOutUrl);
 
     // 7. Update attendance
     attendance.clockOut = nowUTC; // Simpan UTC untuk consistency

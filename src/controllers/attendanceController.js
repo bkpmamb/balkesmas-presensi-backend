@@ -184,6 +184,7 @@ export const clockOut = async (req, res) => {
     const { latitude, longitude } = req.body;
     const file = req.file;
 
+    // 1. Validasi input
     if (!latitude || !longitude || !file) {
       return res.status(400).json({
         success: false,
@@ -191,6 +192,7 @@ export const clockOut = async (req, res) => {
       });
     }
 
+    // 2. Validasi GPS
     const geoValidation = await validateLocation(
       parseFloat(latitude),
       parseFloat(longitude)
@@ -199,10 +201,11 @@ export const clockOut = async (req, res) => {
     if (!geoValidation.isWithinRange) {
       return res.status(403).json({
         success: false,
-        message: `Anda berada di luar area kantor (${geoValidation.distance}m dari kantor)`,
+        message: `Anda berada di luar area kantor (${geoValidation.distance}m dari kantor, batas ${geoValidation.radiusLimit}m)`,
       });
     }
 
+    // 3. Cari attendance hari ini yang belum clock out
     const today = new Date();
     today.setHours(0, 0, 0, 0);
 
@@ -210,7 +213,7 @@ export const clockOut = async (req, res) => {
       user: req.user._id,
       clockIn: { $gte: today },
       clockOut: null,
-    });
+    }).populate("shift");
 
     if (!attendance) {
       return res.status(404).json({
@@ -220,32 +223,69 @@ export const clockOut = async (req, res) => {
       });
     }
 
+    // 4. Upload foto pulang
     const photoOutUrl = await uploadToS3(file);
 
+    // 5. Hitung status clock out
     const now = new Date();
+    const shift = attendance.shift;
+
+    // Parse end time dari shift
+    const [endHour, endMinute] = shift.endTime.split(":").map(Number);
+    const scheduleEndTime = new Date(now);
+    scheduleEndTime.setHours(endHour, endMinute, 0, 0);
+
+    let clockOutStatus = "normal";
+    let earlyMinutes = 0;
+
+    // Jika pulang sebelum jam seharusnya
+    if (now < scheduleEndTime) {
+      clockOutStatus = "early";
+      earlyMinutes = Math.floor((scheduleEndTime - now) / (1000 * 60));
+    }
+
+    // 6. Hitung durasi kerja
+    const workDurationMs = now - attendance.clockIn;
+    const workMinutes = Math.floor(workDurationMs / (1000 * 60));
+    const workHours = Math.floor(workMinutes / 60);
+    const remainingMinutes = workMinutes % 60;
+
+    // 7. Update attendance
     attendance.clockOut = now;
     attendance.photoOutUrl = photoOutUrl;
     attendance.clockOutLocation = {
       type: "Point",
       coordinates: [parseFloat(longitude), parseFloat(latitude)],
     };
-
-    const diffMs = attendance.clockOut - attendance.clockIn;
-    attendance.workMinutes = Math.floor(diffMs / (1000 * 60));
+    attendance.clockOutStatus = clockOutStatus;
+    attendance.workMinutes = workMinutes;
 
     await attendance.save();
 
+    // 8. Response
     res.status(200).json({
       success: true,
-      message: "Presensi pulang berhasil",
+      message:
+        clockOutStatus === "early"
+          ? `Presensi pulang berhasil (pulang lebih awal ${earlyMinutes} menit)`
+          : "Presensi pulang berhasil",
       data: {
         _id: attendance._id,
         clockIn: attendance.clockIn,
         clockOut: attendance.clockOut,
-        workDuration: `${Math.floor(attendance.workMinutes / 60)} jam ${
-          attendance.workMinutes % 60
-        } menit`,
-        photoOut: photoOutUrl,
+        clockOutStatus: attendance.clockOutStatus,
+        earlyMinutes: clockOutStatus === "early" ? earlyMinutes : 0,
+        workDuration: `${workHours} jam ${remainingMinutes} menit`,
+        workMinutes: workMinutes,
+        shift: {
+          name: shift.name,
+          startTime: shift.startTime,
+          endTime: shift.endTime,
+        },
+        location: {
+          distance: geoValidation.distance,
+          isValid: true,
+        },
       },
     });
   } catch (error) {
@@ -260,14 +300,31 @@ export const clockOut = async (req, res) => {
 
 export const getAttendanceHistory = async (req, res) => {
   try {
+    const page = parseInt(req.query.page) || 1;
+    const limit = parseInt(req.query.limit) || 10;
+    const skip = (page - 1) * limit;
+
     const history = await Attendance.find({ user: req.user._id })
       .sort({ clockIn: -1 })
-      .populate("shift", "name startTime endTime");
+      .populate("shift", "name startTime endTime")
+      .skip(skip)
+      .limit(limit);
+
+    const totalRecords = await Attendance.countDocuments({
+      user: req.user._id,
+    });
+    const totalPages = Math.ceil(totalRecords / limit);
 
     const summary = {
-      totalHadir: history.length,
-      totalTerlambat: history.filter((item) => item.clockInStatus === "late")
-        .length,
+      totalHadir: totalRecords,
+      totalTerlambat: await Attendance.countDocuments({
+        user: req.user._id,
+        clockInStatus: "late",
+      }),
+      totalPulangAwal: await Attendance.countDocuments({
+        user: req.user._id,
+        clockOutStatus: "early",
+      }),
       totalMenitKerja: history.reduce(
         (acc, item) => acc + (item.workMinutes || 0),
         0
@@ -279,6 +336,14 @@ export const getAttendanceHistory = async (req, res) => {
       message: "Riwayat presensi berhasil diambil",
       summary,
       data: history,
+      pagination: {
+        totalData: totalRecords,
+        totalPages,
+        currentPage: page,
+        limit,
+        hasNextPage: page < totalPages,
+        hasPrevPage: page > 1,
+      },
     });
   } catch (error) {
     res.status(500).json({

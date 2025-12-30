@@ -39,14 +39,11 @@ const validateLocation = async (userLat, userLon) => {
   };
 };
 
-// ✅ NEW: Clock In dengan ShiftSchedule
-// ✅ Clock In dengan ShiftSchedule
 export const clockIn = async (req, res) => {
   try {
     const { latitude, longitude } = req.body;
     const file = req.file;
 
-    // 1. Validasi input
     if (!latitude || !longitude || !file) {
       return res.status(400).json({
         success: false,
@@ -54,21 +51,12 @@ export const clockIn = async (req, res) => {
       });
     }
 
-    // ✅ DEBUG LOG START
-    console.log("==========================================");
-    console.log("🔍 CLOCK IN DEBUG - START");
-    console.log("==========================================");
+    // ✅ GUNAKAN WIB TIME (UTC+7)
+    const WIB_OFFSET = 7 * 60 * 60 * 1000;
+    const nowUTC = new Date();
+    const nowWIB = new Date(nowUTC.getTime() + WIB_OFFSET);
 
-    const now = new Date(); // ✅ Hanya declare 1x di sini
-    console.log("📅 Server Time (UTC):", now.toISOString());
-    console.log("📅 Server Time (String):", now.toString());
-
-    // Coba WIB time
-    const wibOffset = 7 * 60 * 60 * 1000;
-    const wibTime = new Date(now.getTime() + wibOffset);
-    console.log("📅 WIB Time:", wibTime.toISOString());
-
-    const dayOfWeek = now.getDay(); // ✅ Hanya declare 1x di sini
+    const dayOfWeek = nowWIB.getDay(); // Day berdasarkan WIB
     const dayNames = [
       "Minggu",
       "Senin",
@@ -79,22 +67,18 @@ export const clockIn = async (req, res) => {
       "Sabtu",
     ];
 
-    console.log("📆 Day of Week (Number):", dayOfWeek);
-    console.log("📆 Day Name:", dayNames[dayOfWeek]);
-
-    console.log("👤 User from Token:");
-    console.log("   - ID:", req.user._id.toString());
-    console.log("   - Name:", req.user.name);
-    console.log("   - Category:", req.user.category);
-
-    console.log("🔍 Searching schedule with:");
-    console.log("   - user:", req.user._id.toString());
-    console.log("   - dayOfWeek:", dayOfWeek);
-    console.log("   - isActive: true");
-
+    console.log("==========================================");
+    console.log("🔍 CLOCK IN DEBUG");
+    console.log("UTC Time:", nowUTC.toISOString());
+    console.log("WIB Time:", nowWIB.toISOString());
+    console.log(
+      "WIB Local:",
+      nowWIB.toLocaleString("id-ID", { timeZone: "Asia/Jakarta" })
+    );
+    console.log("User:", req.user.name);
+    console.log("Day:", dayNames[dayOfWeek]);
     console.log("==========================================");
 
-    // 2. Validasi GPS
     const geoValidation = await validateLocation(
       parseFloat(latitude),
       parseFloat(longitude)
@@ -103,23 +87,23 @@ export const clockIn = async (req, res) => {
     if (!geoValidation.isWithinRange) {
       return res.status(403).json({
         success: false,
-        message: `Anda berada di luar area kantor (${geoValidation.distance}m dari kantor, batas ${geoValidation.radiusLimit}m)`,
+        message: `${req.user.name}, Anda berada di luar area kantor (${geoValidation.distance}m dari kantor, batas ${geoValidation.radiusLimit}m)`,
       });
     }
 
-    // 3. Cek apakah sudah presensi hari ini
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
+    // ✅ Gunakan WIB untuk cek sudah clock in atau belum
+    const todayWIB = new Date(nowWIB);
+    todayWIB.setHours(0, 0, 0, 0);
 
     const alreadyClockIn = await Attendance.findOne({
       user: req.user._id,
-      clockIn: { $gte: today },
+      date: todayWIB, // Cek berdasarkan date field
     });
 
     if (alreadyClockIn) {
       return res.status(400).json({
         success: false,
-        message: "Anda sudah melakukan presensi masuk hari ini",
+        message: `${req.user.name}, Anda sudah melakukan presensi masuk hari ini`,
         data: {
           clockIn: alreadyClockIn.clockIn,
           shift: alreadyClockIn.shift,
@@ -127,80 +111,62 @@ export const clockIn = async (req, res) => {
       });
     }
 
-    // 4. Cari ShiftSchedule user untuk hari ini
     const schedule = await ShiftSchedule.findOne({
       user: req.user._id,
       dayOfWeek: dayOfWeek,
       isActive: true,
     }).populate("shift");
 
-    // ✅ DEBUG RESULT
-    console.log("==========================================");
-    console.log("🔍 SCHEDULE QUERY RESULT:");
-    if (schedule) {
-      console.log("✅ SCHEDULE FOUND!");
-      console.log("   - Schedule ID:", schedule._id);
-      console.log("   - User:", schedule.user);
-      console.log("   - Day of Week:", schedule.dayOfWeek);
-      console.log("   - Shift ID:", schedule.shift?._id);
-      console.log("   - Shift Name:", schedule.shift?.name);
-      console.log(
-        "   - Shift Time:",
-        schedule.shift?.startTime,
-        "-",
-        schedule.shift?.endTime
-      );
-    } else {
-      console.log("❌ SCHEDULE NOT FOUND!");
-      console.log("   Possible reasons:");
-      console.log("   1. dayOfWeek mismatch (expected:", dayOfWeek, ")");
-      console.log("   2. user ID mismatch");
-      console.log("   3. isActive is false");
-    }
-    console.log("==========================================");
-
     if (!schedule || !schedule.shift) {
       return res.status(404).json({
         success: false,
-        message: `${req.user.name}, Anda tidak memiliki jadwal shift untuk hari ini (${dayNames[dayOfWeek]}). Hubungi admin untuk mengatur jadwal.`, // ✅ Tambah nama & hapus dayOfWeek number
+        message: `${req.user.name}, Anda tidak memiliki jadwal shift untuk hari ini (${dayNames[dayOfWeek]}). Hubungi admin untuk mengatur jadwal.`,
       });
     }
 
     const assignedShift = schedule.shift;
 
-    // 5. Hitung status keterlambatan dengan toleransi
+    // ✅ Hitung late berdasarkan WIB time
     const [startHour, startMinute] = assignedShift.startTime
       .split(":")
       .map(Number);
-    const scheduleTime = new Date(now);
-    scheduleTime.setHours(startHour, startMinute, 0, 0);
+
+    // Schedule time dalam WIB
+    const scheduleTimeWIB = new Date(nowWIB);
+    scheduleTimeWIB.setHours(startHour, startMinute, 0, 0);
 
     // Tambahkan toleransi
-    const toleranceTime = new Date(scheduleTime);
-    toleranceTime.setMinutes(
-      scheduleTime.getMinutes() + (assignedShift.toleranceMinutes || 0)
+    const toleranceTimeWIB = new Date(scheduleTimeWIB);
+    toleranceTimeWIB.setMinutes(
+      scheduleTimeWIB.getMinutes() + (assignedShift.toleranceMinutes || 0)
     );
 
     let clockInStatus = "ontime";
     let lateMinutes = 0;
 
-    if (now > toleranceTime) {
+    console.log("Schedule Time (WIB):", scheduleTimeWIB.toISOString());
+    console.log("Tolerance Time (WIB):", toleranceTimeWIB.toISOString());
+    console.log("Clock In Time (WIB):", nowWIB.toISOString());
+
+    if (nowWIB > toleranceTimeWIB) {
       clockInStatus = "late";
-      lateMinutes = Math.floor((now - scheduleTime) / (1000 * 60));
+      lateMinutes = Math.floor((nowWIB - scheduleTimeWIB) / (1000 * 60));
+      console.log("⚠️ LATE by", lateMinutes, "minutes");
+    } else {
+      console.log("✅ ON TIME");
     }
 
-    // 6. Upload foto ke S3
     const photoUrl = await uploadToS3(file);
 
-    // 7. Simpan ke database
-    const dateOnly = new Date(now);
-    dateOnly.setHours(0, 0, 0, 0);
+    // ✅ Simpan date dalam WIB (00:00:00)
+    const dateOnlyWIB = new Date(nowWIB);
+    dateOnlyWIB.setHours(0, 0, 0, 0);
 
     const newAttendance = await Attendance.create({
       user: req.user._id,
       shift: assignedShift._id,
-      date: dateOnly,
-      clockIn: now,
+      date: dateOnlyWIB, // Date dalam WIB
+      clockIn: nowUTC, // Simpan waktu asli UTC untuk consistency
       clockInLocation: {
         type: "Point",
         coordinates: [parseFloat(longitude), parseFloat(latitude)],
@@ -210,18 +176,19 @@ export const clockIn = async (req, res) => {
       lateMinutes,
     });
 
-    // Populate untuk response
     await newAttendance.populate("shift", "name startTime endTime");
 
     console.log("✅ CLOCK IN SUCCESS!");
+    console.log("Status:", clockInStatus);
+    console.log("Late Minutes:", lateMinutes);
     console.log("==========================================");
 
     res.status(201).json({
       success: true,
       message:
         clockInStatus === "ontime"
-          ? "Presensi masuk berhasil (tepat waktu)"
-          : `Presensi masuk berhasil (terlambat ${lateMinutes} menit)`,
+          ? `${req.user.name}, presensi masuk berhasil (tepat waktu)`
+          : `${req.user.name}, presensi masuk berhasil (terlambat ${lateMinutes} menit)`,
       data: {
         _id: newAttendance._id,
         clockIn: newAttendance.clockIn,
@@ -236,7 +203,6 @@ export const clockIn = async (req, res) => {
     });
   } catch (error) {
     console.error("❌ CLOCK IN ERROR:", error);
-    console.error("==========================================");
     res.status(500).json({
       success: false,
       message: "Gagal melakukan presensi masuk",
@@ -245,7 +211,6 @@ export const clockIn = async (req, res) => {
   }
 };
 
-// ✅ Clock Out (belum diupdate, nanti di step berikutnya)
 export const clockOut = async (req, res) => {
   try {
     const { latitude, longitude } = req.body;
@@ -259,6 +224,18 @@ export const clockOut = async (req, res) => {
       });
     }
 
+    // ✅ GUNAKAN WIB TIME (UTC+7)
+    const WIB_OFFSET = 7 * 60 * 60 * 1000;
+    const nowUTC = new Date();
+    const nowWIB = new Date(nowUTC.getTime() + WIB_OFFSET);
+
+    console.log("==========================================");
+    console.log("🔍 CLOCK OUT DEBUG");
+    console.log("UTC Time:", nowUTC.toISOString());
+    console.log("WIB Time:", nowWIB.toISOString());
+    console.log("User:", req.user.name);
+    console.log("==========================================");
+
     // 2. Validasi GPS
     const geoValidation = await validateLocation(
       parseFloat(latitude),
@@ -268,17 +245,18 @@ export const clockOut = async (req, res) => {
     if (!geoValidation.isWithinRange) {
       return res.status(403).json({
         success: false,
-        message: `${req.user.name}, Anda berada di luar area kantor (${geoValidation.distance}m dari kantor, batas ${geoValidation.radiusLimit}m)`, // ✅ Tambah nama
+        message: `${req.user.name}, Anda berada di luar area kantor (${geoValidation.distance}m dari kantor, batas ${geoValidation.radiusLimit}m)`,
       });
     }
 
     // 3. Cari attendance hari ini yang belum clock out
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
+    // ✅ Gunakan WIB date untuk query
+    const todayWIB = new Date(nowWIB);
+    todayWIB.setHours(0, 0, 0, 0);
 
     const attendance = await Attendance.findOne({
       user: req.user._id,
-      clockIn: { $gte: today },
+      date: todayWIB, // Query by date field (lebih reliable)
       clockOut: null,
     }).populate("shift");
 
@@ -289,35 +267,45 @@ export const clockOut = async (req, res) => {
       });
     }
 
+    console.log("Attendance found:", attendance._id);
+    console.log("Clock In:", attendance.clockIn);
+
     // 4. Upload foto pulang
     const photoOutUrl = await uploadToS3(file);
 
-    // 5. Hitung status clock out
-    const now = new Date();
+    // 5. Hitung status clock out berdasarkan WIB
     const shift = attendance.shift;
 
-    // Parse end time dari shift
+    // Parse end time dari shift (dalam WIB)
     const [endHour, endMinute] = shift.endTime.split(":").map(Number);
-    const scheduleEndTime = new Date(now);
-    scheduleEndTime.setHours(endHour, endMinute, 0, 0);
+    const scheduleEndTimeWIB = new Date(nowWIB);
+    scheduleEndTimeWIB.setHours(endHour, endMinute, 0, 0);
 
     let clockOutStatus = "normal";
     let earlyMinutes = 0;
 
+    console.log("Schedule End Time (WIB):", scheduleEndTimeWIB.toISOString());
+    console.log("Clock Out Time (WIB):", nowWIB.toISOString());
+
     // Jika pulang sebelum jam seharusnya
-    if (now < scheduleEndTime) {
+    if (nowWIB < scheduleEndTimeWIB) {
       clockOutStatus = "early";
-      earlyMinutes = Math.floor((scheduleEndTime - now) / (1000 * 60));
+      earlyMinutes = Math.floor((scheduleEndTimeWIB - nowWIB) / (1000 * 60));
+      console.log("⚠️ EARLY by", earlyMinutes, "minutes");
+    } else {
+      console.log("✅ NORMAL (on time or late)");
     }
 
-    // 6. Hitung durasi kerja
-    const workDurationMs = now - attendance.clockIn;
+    // 6. Hitung durasi kerja (dari clockIn sampai sekarang)
+    const workDurationMs = nowUTC - attendance.clockIn;
     const workMinutes = Math.floor(workDurationMs / (1000 * 60));
     const workHours = Math.floor(workMinutes / 60);
     const remainingMinutes = workMinutes % 60;
 
+    console.log("Work Duration:", workHours, "hours", remainingMinutes, "minutes");
+
     // 7. Update attendance
-    attendance.clockOut = now;
+    attendance.clockOut = nowUTC; // Simpan UTC untuk consistency
     attendance.photoOutUrl = photoOutUrl;
     attendance.clockOutLocation = {
       type: "Point",
@@ -327,6 +315,12 @@ export const clockOut = async (req, res) => {
     attendance.workMinutes = workMinutes;
 
     await attendance.save();
+
+    console.log("✅ CLOCK OUT SUCCESS!");
+    console.log("Status:", clockOutStatus);
+    console.log("Early Minutes:", earlyMinutes);
+    console.log("Work Minutes:", workMinutes);
+    console.log("==========================================");
 
     // 8. Response
     res.status(200).json({
@@ -339,7 +333,9 @@ export const clockOut = async (req, res) => {
         _id: attendance._id,
         clockIn: attendance.clockIn,
         clockOut: attendance.clockOut,
+        clockInStatus: attendance.clockInStatus,
         clockOutStatus: attendance.clockOutStatus,
+        lateMinutes: attendance.lateMinutes,
         earlyMinutes: clockOutStatus === "early" ? earlyMinutes : 0,
         workDuration: `${workHours} jam ${remainingMinutes} menit`,
         workMinutes: workMinutes,
@@ -355,7 +351,7 @@ export const clockOut = async (req, res) => {
       },
     });
   } catch (error) {
-    console.error("Clock Out Error:", error);
+    console.error("❌ CLOCK OUT ERROR:", error);
     res.status(500).json({
       success: false,
       message: "Gagal melakukan presensi pulang",

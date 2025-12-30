@@ -40,6 +40,7 @@ const validateLocation = async (userLat, userLon) => {
 };
 
 // ✅ NEW: Clock In dengan ShiftSchedule
+// ✅ Clock In dengan ShiftSchedule
 export const clockIn = async (req, res) => {
   try {
     const { latitude, longitude } = req.body;
@@ -52,6 +53,46 @@ export const clockIn = async (req, res) => {
         message: "Lokasi dan foto wajib diisi",
       });
     }
+
+    // ✅ DEBUG LOG START
+    console.log("==========================================");
+    console.log("🔍 CLOCK IN DEBUG - START");
+    console.log("==========================================");
+
+    const now = new Date(); // ✅ Hanya declare 1x di sini
+    console.log("📅 Server Time (UTC):", now.toISOString());
+    console.log("📅 Server Time (String):", now.toString());
+
+    // Coba WIB time
+    const wibOffset = 7 * 60 * 60 * 1000;
+    const wibTime = new Date(now.getTime() + wibOffset);
+    console.log("📅 WIB Time:", wibTime.toISOString());
+
+    const dayOfWeek = now.getDay(); // ✅ Hanya declare 1x di sini
+    const dayNames = [
+      "Minggu",
+      "Senin",
+      "Selasa",
+      "Rabu",
+      "Kamis",
+      "Jumat",
+      "Sabtu",
+    ];
+
+    console.log("📆 Day of Week (Number):", dayOfWeek);
+    console.log("📆 Day Name:", dayNames[dayOfWeek]);
+
+    console.log("👤 User from Token:");
+    console.log("   - ID:", req.user._id.toString());
+    console.log("   - Name:", req.user.name);
+    console.log("   - Category:", req.user.category);
+
+    console.log("🔍 Searching schedule with:");
+    console.log("   - user:", req.user._id.toString());
+    console.log("   - dayOfWeek:", dayOfWeek);
+    console.log("   - isActive: true");
+
+    console.log("==========================================");
 
     // 2. Validasi GPS
     const geoValidation = await validateLocation(
@@ -87,19 +128,41 @@ export const clockIn = async (req, res) => {
     }
 
     // 4. Cari ShiftSchedule user untuk hari ini
-    const now = new Date();
-    const dayOfWeek = now.getDay(); // 0 = Minggu, 1 = Senin, dst
-
     const schedule = await ShiftSchedule.findOne({
       user: req.user._id,
       dayOfWeek: dayOfWeek,
       isActive: true,
     }).populate("shift");
 
+    // ✅ DEBUG RESULT
+    console.log("==========================================");
+    console.log("🔍 SCHEDULE QUERY RESULT:");
+    if (schedule) {
+      console.log("✅ SCHEDULE FOUND!");
+      console.log("   - Schedule ID:", schedule._id);
+      console.log("   - User:", schedule.user);
+      console.log("   - Day of Week:", schedule.dayOfWeek);
+      console.log("   - Shift ID:", schedule.shift?._id);
+      console.log("   - Shift Name:", schedule.shift?.name);
+      console.log(
+        "   - Shift Time:",
+        schedule.shift?.startTime,
+        "-",
+        schedule.shift?.endTime
+      );
+    } else {
+      console.log("❌ SCHEDULE NOT FOUND!");
+      console.log("   Possible reasons:");
+      console.log("   1. dayOfWeek mismatch (expected:", dayOfWeek, ")");
+      console.log("   2. user ID mismatch");
+      console.log("   3. isActive is false");
+    }
+    console.log("==========================================");
+
     if (!schedule || !schedule.shift) {
       return res.status(404).json({
         success: false,
-        message: `Anda tidak memiliki jadwal shift untuk hari ini. Hubungi admin untuk mengatur jadwal.`,
+        message: `Anda tidak memiliki jadwal shift untuk hari ini (dayOfWeek: ${dayOfWeek}, day: ${dayNames[dayOfWeek]}). Hubungi admin untuk mengatur jadwal.`,
       });
     }
 
@@ -123,7 +186,7 @@ export const clockIn = async (req, res) => {
 
     if (now > toleranceTime) {
       clockInStatus = "late";
-      lateMinutes = Math.floor((now - scheduleTime) / (1000 * 60)); // Total menit terlambat dari jam seharusnya (tanpa toleransi)
+      lateMinutes = Math.floor((now - scheduleTime) / (1000 * 60));
     }
 
     // 6. Upload foto ke S3
@@ -150,6 +213,9 @@ export const clockIn = async (req, res) => {
     // Populate untuk response
     await newAttendance.populate("shift", "name startTime endTime");
 
+    console.log("✅ CLOCK IN SUCCESS!");
+    console.log("==========================================");
+
     res.status(201).json({
       success: true,
       message:
@@ -169,7 +235,8 @@ export const clockIn = async (req, res) => {
       },
     });
   } catch (error) {
-    console.error("Clock In Error:", error);
+    console.error("❌ CLOCK IN ERROR:", error);
+    console.error("==========================================");
     res.status(500).json({
       success: false,
       message: "Gagal melakukan presensi masuk",

@@ -1,7 +1,7 @@
 {
   "info": {
-    "name": "Balkesmas Presensi API - v2",
-    "_postman_id": "balkesmas-presensi-v2",
+    "name": "Balkesmas Presensi API - Complete",
+    "_postman_id": "balkesmas-presensi-complete",
     "description": "Complete API Collection untuk sistem presensi Balkesmas",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
   },
@@ -18,11 +18,16 @@
   "variable": [
     {
       "key": "base_url",
-      "value": "http://localhost:5001",
+      "value": "https://balkesmas-presensi-backend.vercel.app",
       "type": "string"
     },
     {
       "key": "jwt_token",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "jwt_token_employee",
       "value": "",
       "type": "string"
     }
@@ -41,8 +46,7 @@
                   "if (pm.response.code === 200) {",
                   "    var jsonData = pm.response.json();",
                   "    pm.collectionVariables.set(\"jwt_token\", jsonData.token);",
-                  "    pm.collectionVariables.set(\"user_id\", jsonData._id);",
-                  "    console.log(\"Token saved:\", jsonData.token);",
+                  "    console.log(\"✅ Admin Token saved:\", jsonData.token);",
                   "}"
                 ],
                 "type": "text/javascript"
@@ -73,8 +77,26 @@
           "response": []
         },
         {
-          "name": "Register User",
+          "name": "Login Employee",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "if (pm.response.code === 200) {",
+                  "    var jsonData = pm.response.json();",
+                  "    pm.collectionVariables.set(\"jwt_token_employee\", jsonData.token);",
+                  "    console.log(\"✅ Employee Token saved:\", jsonData.token);",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
           "request": {
+            "auth": {
+              "type": "noauth"
+            },
             "method": "POST",
             "header": [
               {
@@ -84,12 +106,278 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"name\": \"Test Employee\",\n  \"username\": \"employee1\",\n  \"password\": \"password123\",\n  \"role\": \"employee\",\n  \"category\": \"CATEGORY_ID_HERE\",\n  \"employeeId\": \"SAT001\"\n}"
+              "raw": "{\n  \"username\": \"liliana.nurintan\",\n  \"password\": \"password123\"\n}"
             },
             "url": {
-              "raw": "{{base_url}}/api/auth/register",
+              "raw": "{{base_url}}/api/auth/login",
               "host": ["{{base_url}}"],
-              "path": ["api", "auth", "register"]
+              "path": ["api", "auth", "login"]
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Attendance Flow",
+      "description": "Complete attendance flow: Clock In → Clock Out",
+      "item": [
+        {
+          "name": "1. Get Today Attendance (Check Status)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/attendance/today",
+              "host": ["{{base_url}}"],
+              "path": ["api", "attendance", "today"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "2. Clock In",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "if (pm.response.code === 201) {",
+                  "    var jsonData = pm.response.json();",
+                  "    console.log(\"✅ Clock In Success!\");",
+                  "    console.log(\"   Status:\", jsonData.data.clockInStatus);",
+                  "    console.log(\"   Late Minutes:\", jsonData.data.lateMinutes);",
+                  "    console.log(\"   Shift:\", jsonData.data.shift.name);",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{jwt_token_employee}}",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                {
+                  "key": "latitude",
+                  "value": "-7.0051",
+                  "description": "Latitude lokasi kantor",
+                  "type": "text"
+                },
+                {
+                  "key": "longitude",
+                  "value": "110.4381",
+                  "description": "Longitude lokasi kantor",
+                  "type": "text"
+                },
+                {
+                  "key": "image",
+                  "description": "Upload foto selfie",
+                  "type": "file",
+                  "src": []
+                }
+              ]
+            },
+            "url": {
+              "raw": "{{base_url}}/api/attendance/clock-in",
+              "host": ["{{base_url}}"],
+              "path": ["api", "attendance", "clock-in"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "3. Get Today Attendance (After Clock In)",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{jwt_token_employee}}",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/attendance/today",
+              "host": ["{{base_url}}"],
+              "path": ["api", "attendance", "today"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "4. Clock Out",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "if (pm.response.code === 200) {",
+                  "    var jsonData = pm.response.json();",
+                  "    console.log(\"✅ Clock Out Success!\");",
+                  "    console.log(\"   Status:\", jsonData.data.clockOutStatus);",
+                  "    console.log(\"   Work Duration:\", jsonData.data.workDuration);",
+                  "    console.log(\"   Early Minutes:\", jsonData.data.earlyMinutes);",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{jwt_token_employee}}",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                {
+                  "key": "latitude",
+                  "value": "-7.0051",
+                  "description": "Latitude lokasi kantor",
+                  "type": "text"
+                },
+                {
+                  "key": "longitude",
+                  "value": "110.4381",
+                  "description": "Longitude lokasi kantor",
+                  "type": "text"
+                },
+                {
+                  "key": "image",
+                  "description": "Upload foto selfie pulang",
+                  "type": "file",
+                  "src": []
+                }
+              ]
+            },
+            "url": {
+              "raw": "{{base_url}}/api/attendance/clock-out",
+              "host": ["{{base_url}}"],
+              "path": ["api", "attendance", "clock-out"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "5. Get Attendance History",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{jwt_token_employee}}",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/attendance/my-history?page=1&limit=10",
+              "host": ["{{base_url}}"],
+              "path": ["api", "attendance", "my-history"],
+              "query": [
+                {
+                  "key": "page",
+                  "value": "1"
+                },
+                {
+                  "key": "limit",
+                  "value": "10"
+                }
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Clock In - Outside Radius (Error Test)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{jwt_token_employee}}",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                {
+                  "key": "latitude",
+                  "value": "-7.0500",
+                  "description": "Lokasi di luar radius",
+                  "type": "text"
+                },
+                {
+                  "key": "longitude",
+                  "value": "110.5000",
+                  "description": "Lokasi di luar radius",
+                  "type": "text"
+                },
+                {
+                  "key": "image",
+                  "type": "file",
+                  "src": []
+                }
+              ]
+            },
+            "url": {
+              "raw": "{{base_url}}/api/attendance/clock-in",
+              "host": ["{{base_url}}"],
+              "path": ["api", "attendance", "clock-in"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Clock In - No Schedule (Error Test)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{jwt_token_employee}}",
+                "type": "text",
+                "description": "Test di hari Sabtu/Minggu yang tidak ada schedule"
+              }
+            ],
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                {
+                  "key": "latitude",
+                  "value": "-7.0051",
+                  "type": "text"
+                },
+                {
+                  "key": "longitude",
+                  "value": "110.4381",
+                  "type": "text"
+                },
+                {
+                  "key": "image",
+                  "type": "file",
+                  "src": []
+                }
+              ]
+            },
+            "url": {
+              "raw": "{{base_url}}/api/attendance/clock-in",
+              "host": ["{{base_url}}"],
+              "path": ["api", "attendance", "clock-in"]
             }
           },
           "response": []
@@ -105,7 +393,7 @@
             "method": "GET",
             "header": [],
             "url": {
-              "raw": "{{base_url}}/api/admin/categories?page=1&limit=10&search=",
+              "raw": "{{base_url}}/api/admin/categories?page=1&limit=10",
               "host": ["{{base_url}}"],
               "path": ["api", "admin", "categories"],
               "query": [
@@ -116,10 +404,6 @@
                 {
                   "key": "limit",
                   "value": "10"
-                },
-                {
-                  "key": "search",
-                  "value": ""
                 }
               ]
             }
@@ -135,25 +419,6 @@
               "raw": "{{base_url}}/api/admin/categories/list",
               "host": ["{{base_url}}"],
               "path": ["api", "admin", "categories", "list"]
-            }
-          },
-          "response": []
-        },
-        {
-          "name": "Get Category by ID",
-          "request": {
-            "method": "GET",
-            "header": [],
-            "url": {
-              "raw": "{{base_url}}/api/admin/categories/:id",
-              "host": ["{{base_url}}"],
-              "path": ["api", "admin", "categories", ":id"],
-              "variable": [
-                {
-                  "key": "id",
-                  "value": "CATEGORY_ID_HERE"
-                }
-              ]
             }
           },
           "response": []
@@ -179,72 +444,6 @@
             }
           },
           "response": []
-        },
-        {
-          "name": "Update Category",
-          "request": {
-            "method": "PUT",
-            "header": [
-              {
-                "key": "Content-Type",
-                "value": "application/json"
-              }
-            ],
-            "body": {
-              "mode": "raw",
-              "raw": "{\n  \"name\": \"Driver Ambulance\",\n  \"prefix\": \"DRV\",\n  \"description\": \"Pengemudi ambulance\",\n  \"isActive\": true\n}"
-            },
-            "url": {
-              "raw": "{{base_url}}/api/admin/categories/:id",
-              "host": ["{{base_url}}"],
-              "path": ["api", "admin", "categories", ":id"],
-              "variable": [
-                {
-                  "key": "id",
-                  "value": "CATEGORY_ID_HERE"
-                }
-              ]
-            }
-          },
-          "response": []
-        },
-        {
-          "name": "Delete Category",
-          "request": {
-            "method": "DELETE",
-            "header": [],
-            "url": {
-              "raw": "{{base_url}}/api/admin/categories/:id",
-              "host": ["{{base_url}}"],
-              "path": ["api", "admin", "categories", ":id"],
-              "variable": [
-                {
-                  "key": "id",
-                  "value": "CATEGORY_ID_HERE"
-                }
-              ]
-            }
-          },
-          "response": []
-        },
-        {
-          "name": "Toggle Category Status",
-          "request": {
-            "method": "PATCH",
-            "header": [],
-            "url": {
-              "raw": "{{base_url}}/api/admin/categories/:id/toggle",
-              "host": ["{{base_url}}"],
-              "path": ["api", "admin", "categories", ":id", "toggle"],
-              "variable": [
-                {
-                  "key": "id",
-                  "value": "CATEGORY_ID_HERE"
-                }
-              ]
-            }
-          },
-          "response": []
         }
       ]
     },
@@ -257,27 +456,9 @@
             "method": "GET",
             "header": [],
             "url": {
-              "raw": "{{base_url}}/api/admin/shifts?page=1&limit=10&search=&category=",
+              "raw": "{{base_url}}/api/admin/shifts",
               "host": ["{{base_url}}"],
-              "path": ["api", "admin", "shifts"],
-              "query": [
-                {
-                  "key": "page",
-                  "value": "1"
-                },
-                {
-                  "key": "limit",
-                  "value": "10"
-                },
-                {
-                  "key": "search",
-                  "value": ""
-                },
-                {
-                  "key": "category",
-                  "value": ""
-                }
-              ]
+              "path": ["api", "admin", "shifts"]
             }
           },
           "response": []
@@ -294,114 +475,7 @@
               "variable": [
                 {
                   "key": "categoryId",
-                  "value": "CATEGORY_ID_HERE"
-                }
-              ]
-            }
-          },
-          "response": []
-        },
-        {
-          "name": "Get Shift by ID",
-          "request": {
-            "method": "GET",
-            "header": [],
-            "url": {
-              "raw": "{{base_url}}/api/admin/shifts/:id",
-              "host": ["{{base_url}}"],
-              "path": ["api", "admin", "shifts", ":id"],
-              "variable": [
-                {
-                  "key": "id",
-                  "value": "SHIFT_ID_HERE"
-                }
-              ]
-            }
-          },
-          "response": []
-        },
-        {
-          "name": "Create Shift",
-          "request": {
-            "method": "POST",
-            "header": [
-              {
-                "key": "Content-Type",
-                "value": "application/json"
-              }
-            ],
-            "body": {
-              "mode": "raw",
-              "raw": "{\n  \"name\": \"Satpam Subuh\",\n  \"category\": \"CATEGORY_ID_HERE\",\n  \"startTime\": \"04:00\",\n  \"endTime\": \"12:00\",\n  \"toleranceMinutes\": 15,\n  \"description\": \"Shift subuh untuk satpam\"\n}"
-            },
-            "url": {
-              "raw": "{{base_url}}/api/admin/shifts",
-              "host": ["{{base_url}}"],
-              "path": ["api", "admin", "shifts"]
-            }
-          },
-          "response": []
-        },
-        {
-          "name": "Update Shift",
-          "request": {
-            "method": "PUT",
-            "header": [
-              {
-                "key": "Content-Type",
-                "value": "application/json"
-              }
-            ],
-            "body": {
-              "mode": "raw",
-              "raw": "{\n  \"name\": \"Satpam Subuh Updated\",\n  \"startTime\": \"05:00\",\n  \"endTime\": \"13:00\",\n  \"toleranceMinutes\": 20,\n  \"isActive\": true\n}"
-            },
-            "url": {
-              "raw": "{{base_url}}/api/admin/shifts/:id",
-              "host": ["{{base_url}}"],
-              "path": ["api", "admin", "shifts", ":id"],
-              "variable": [
-                {
-                  "key": "id",
-                  "value": "SHIFT_ID_HERE"
-                }
-              ]
-            }
-          },
-          "response": []
-        },
-        {
-          "name": "Delete Shift",
-          "request": {
-            "method": "DELETE",
-            "header": [],
-            "url": {
-              "raw": "{{base_url}}/api/admin/shifts/:id",
-              "host": ["{{base_url}}"],
-              "path": ["api", "admin", "shifts", ":id"],
-              "variable": [
-                {
-                  "key": "id",
-                  "value": "SHIFT_ID_HERE"
-                }
-              ]
-            }
-          },
-          "response": []
-        },
-        {
-          "name": "Toggle Shift Status",
-          "request": {
-            "method": "PATCH",
-            "header": [],
-            "url": {
-              "raw": "{{base_url}}/api/admin/shifts/:id/toggle",
-              "host": ["{{base_url}}"],
-              "path": ["api", "admin", "shifts", ":id", "toggle"],
-              "variable": [
-                {
-                  "key": "id",
-                  "value": "SHIFT_ID_HERE"
+                  "value": "69524224fc2c4818e7fe9dc0"
                 }
               ]
             }
@@ -411,7 +485,7 @@
       ]
     },
     {
-      "name": "Settings (Location)",
+      "name": "Settings",
       "item": [
         {
           "name": "Get Settings",
@@ -438,7 +512,7 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"officeName\": \"Balkesmas Ambarawa\",\n  \"officeAddress\": \"Jl. Pemuda No. 123, Ambarawa\",\n  \"targetLatitude\": -7.0051,\n  \"targetLongitude\": 110.4381,\n  \"radiusMeters\": 300\n}"
+              "raw": "{\n  \"officeName\": \"Balkesmas Ambarawa\",\n  \"officeAddress\": \"Jl. Pemuda No. 456, Ambarawa\",\n  \"targetLatitude\": -7.0051,\n  \"targetLongitude\": 110.4381,\n  \"radiusMeters\": 300\n}"
             },
             "url": {
               "raw": "{{base_url}}/api/admin/settings",
@@ -476,29 +550,6 @@
       "name": "Shift Schedules",
       "item": [
         {
-          "name": "Get Schedules Overview",
-          "request": {
-            "method": "GET",
-            "header": [],
-            "url": {
-              "raw": "{{base_url}}/api/admin/shift-schedules/overview?page=1&limit=10",
-              "host": ["{{base_url}}"],
-              "path": ["api", "admin", "shift-schedules", "overview"],
-              "query": [
-                {
-                  "key": "page",
-                  "value": "1"
-                },
-                {
-                  "key": "limit",
-                  "value": "10"
-                }
-              ]
-            }
-          },
-          "response": []
-        },
-        {
           "name": "Get User Schedule",
           "request": {
             "method": "GET",
@@ -510,7 +561,7 @@
               "variable": [
                 {
                   "key": "userId",
-                  "value": "USER_ID_HERE"
+                  "value": "6952ad7befba528b55a8cbe8"
                 }
               ]
             }
@@ -518,7 +569,7 @@
           "response": []
         },
         {
-          "name": "Set Single Day Schedule",
+          "name": "Set Schedule (Bulk)",
           "request": {
             "method": "POST",
             "header": [
@@ -529,29 +580,7 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"userId\": \"USER_ID_HERE\",\n  \"dayOfWeek\": 1,\n  \"shiftId\": \"SHIFT_ID_HERE\"\n}"
-            },
-            "url": {
-              "raw": "{{base_url}}/api/admin/shift-schedules",
-              "host": ["{{base_url}}"],
-              "path": ["api", "admin", "shift-schedules"]
-            }
-          },
-          "response": []
-        },
-        {
-          "name": "Bulk Set Schedule",
-          "request": {
-            "method": "POST",
-            "header": [
-              {
-                "key": "Content-Type",
-                "value": "application/json"
-              }
-            ],
-            "body": {
-              "mode": "raw",
-              "raw": "{\n  \"userId\": \"USER_ID_HERE\",\n  \"schedules\": [\n    { \"dayOfWeek\": 1, \"shiftId\": \"SHIFT_ID_1\" },\n    { \"dayOfWeek\": 2, \"shiftId\": \"SHIFT_ID_1\" },\n    { \"dayOfWeek\": 3, \"shiftId\": \"SHIFT_ID_2\" },\n    { \"dayOfWeek\": 4, \"shiftId\": \"SHIFT_ID_2\" },\n    { \"dayOfWeek\": 5, \"shiftId\": \"SHIFT_ID_1\" }\n  ]\n}"
+              "raw": "{\n  \"userId\": \"6952ad7befba528b55a8cbe8\",\n  \"schedules\": [\n    { \"dayOfWeek\": 1, \"shiftId\": \"69524225fc2c4818e7fe9dc8\" },\n    { \"dayOfWeek\": 2, \"shiftId\": \"69524225fc2c4818e7fe9dc8\" },\n    { \"dayOfWeek\": 3, \"shiftId\": \"69524225fc2c4818e7fe9dc8\" },\n    { \"dayOfWeek\": 4, \"shiftId\": \"69524225fc2c4818e7fe9dc8\" },\n    { \"dayOfWeek\": 5, \"shiftId\": \"69524225fc2c4818e7fe9dc8\" }\n  ]\n}"
             },
             "url": {
               "raw": "{{base_url}}/api/admin/shift-schedules/bulk",
@@ -560,30 +589,11 @@
             }
           },
           "response": []
-        },
-        {
-          "name": "Delete Schedule",
-          "request": {
-            "method": "DELETE",
-            "header": [],
-            "url": {
-              "raw": "{{base_url}}/api/admin/shift-schedules/:scheduleId",
-              "host": ["{{base_url}}"],
-              "path": ["api", "admin", "shift-schedules", ":scheduleId"],
-              "variable": [
-                {
-                  "key": "scheduleId",
-                  "value": "SCHEDULE_ID_HERE"
-                }
-              ]
-            }
-          },
-          "response": []
         }
       ]
     },
     {
-      "name": "Admin - Employees",
+      "name": "Employees",
       "item": [
         {
           "name": "Get All Employees",
@@ -591,23 +601,9 @@
             "method": "GET",
             "header": [],
             "url": {
-              "raw": "{{base_url}}/api/admin/employees?page=1&limit=10&search=",
+              "raw": "{{base_url}}/api/admin/employees",
               "host": ["{{base_url}}"],
-              "path": ["api", "admin", "employees"],
-              "query": [
-                {
-                  "key": "page",
-                  "value": "1"
-                },
-                {
-                  "key": "limit",
-                  "value": "10"
-                },
-                {
-                  "key": "search",
-                  "value": ""
-                }
-              ]
+              "path": ["api", "admin", "employees"]
             }
           },
           "response": []
@@ -624,7 +620,7 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"name\": \"Budi Santoso\",\n  \"username\": \"budi.santoso\",\n  \"password\": \"password123\",\n  \"employeeId\": \"SAT002\",\n  \"category\": \"CATEGORY_ID_HERE\"\n}"
+              "raw": "{\n  \"name\": \"Test Employee\",\n  \"username\": \"test.employee\",\n  \"password\": \"password123\",\n  \"category\": \"69524224fc2c4818e7fe9dc0\"\n}"
             },
             "url": {
               "raw": "{{base_url}}/api/admin/employees",
@@ -637,7 +633,7 @@
       ]
     },
     {
-      "name": "Admin - Dashboard",
+      "name": "Admin Dashboard",
       "item": [
         {
           "name": "Get Admin Stats",
@@ -648,6 +644,19 @@
               "raw": "{{base_url}}/api/admin/stats",
               "host": ["{{base_url}}"],
               "path": ["api", "admin", "stats"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Get All Attendance",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/admin/all-attendance",
+              "host": ["{{base_url}}"],
+              "path": ["api", "admin", "all-attendance"]
             }
           },
           "response": []

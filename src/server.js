@@ -13,6 +13,7 @@ import categoryRoutes from "./routes/categoryRoutes.js";
 import shiftRoutes from "./routes/shiftRoutes.js";
 import settingsRoutes from "./routes/settingsRoutes.js";
 import shiftScheduleRoutes from "./routes/shiftScheduleRoutes.js";
+import dashboardRoutes from "./routes/dashboardRoutes.js";
 
 dotenv.config();
 const app = express();
@@ -121,6 +122,8 @@ app.use(async (req, res, next) => {
 // ===== ROUTES =====
 app.use("/api/auth", authRoutes);
 app.use("/api/attendance", attendanceRoutes);
+
+app.use("/api/admin/dashboard", dashboardRoutes); 
 app.use("/api/admin", adminRoutes);
 app.use("/api/admin/categories", categoryRoutes);
 app.use("/api/admin/shifts", shiftRoutes);

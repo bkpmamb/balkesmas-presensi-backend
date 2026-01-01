@@ -14,6 +14,7 @@ import shiftRoutes from "./routes/shiftRoutes.js";
 import settingsRoutes from "./routes/settingsRoutes.js";
 import shiftScheduleRoutes from "./routes/shiftScheduleRoutes.js";
 import dashboardRoutes from "./routes/dashboardRoutes.js";
+import exportRoutes from "./routes/exportRoutes.js"; 
 
 dotenv.config();
 const app = express();
@@ -124,6 +125,7 @@ app.use("/api/auth", authRoutes);
 app.use("/api/attendance", attendanceRoutes);
 
 app.use("/api/admin/dashboard", dashboardRoutes); 
+app.use("/api/admin/export", exportRoutes); 
 app.use("/api/admin", adminRoutes);
 app.use("/api/admin/categories", categoryRoutes);
 app.use("/api/admin/shifts", shiftRoutes);

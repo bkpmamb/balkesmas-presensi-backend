@@ -35,12 +35,14 @@
     "date-fns-tz": "^3.2.0",
     "dotenv": "^17.2.3",
     "eslint": "^9.39.2",
+    "exceljs": "^4.4.0",
     "express": "^5.2.1",
     "json-2-csv": "^5.5.10",
     "jsonwebtoken": "^9.0.3",
     "mongoose": "^9.0.2",
     "multer": "^2.0.2",
     "nodemon": "^3.1.11",
+    "pdfkit": "^0.17.2",
     "sharp": "^0.34.5"
   }
 }

@@ -19,6 +19,9 @@ import {
   getAllAttendances,
   getAttendanceById,
   getAttendancesByEmployee,
+  createManualEntry,
+  updateAttendanceManually,
+  getManualEntries,
 } from "../controllers/adminAttendanceController.js";
 
 const router = express.Router();
@@ -47,7 +50,22 @@ router.delete("/attendance/:id", protect, adminOnly, deleteAttendance);
 // Attendance Management
 router.get("/attendances", protect, adminOnly, getAllAttendances);
 router.get("/attendances/:id", protect, adminOnly, getAttendanceById);
-router.get("/attendances/employee/:userId", protect, adminOnly, getAttendancesByEmployee);
+router.get(
+  "/attendances/employee/:userId",
+  protect,
+  adminOnly,
+  getAttendancesByEmployee
+);
 router.delete("/attendance/:id", protect, adminOnly, deleteAttendance);
+
+// Manual Entry
+router.post("/attendance/manual-entry", protect, adminOnly, createManualEntry);
+router.put(
+  "/attendance/:id/manual-update",
+  protect,
+  adminOnly,
+  updateAttendanceManually
+);
+router.get("/attendance/manual-entries", protect, adminOnly, getManualEntries);
 
 export default router;

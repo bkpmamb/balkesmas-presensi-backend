@@ -134,50 +134,6 @@ export const getAllEmployees = async (req, res) => {
   }
 };
 
-// export const createEmployee = async (req, res) => {
-//   try {
-//     const { name, username, password, employeeId, category } = req.body;
-
-//     // Cek apakah username sudah digunakan
-//     const userExists = await User.findOne({ username });
-//     if (userExists) {
-//       return res.status(400).json({ message: "Username sudah digunakan" });
-//     }
-
-//     // Hash password secara manual (jika belum ada logic pre-save di model)
-//     const salt = await bcrypt.genSalt(10);
-//     const hashedPassword = await bcrypt.hash(password, salt);
-
-//     // Simpan ke database
-//     const newUser = await User.create({
-//       name,
-//       username,
-//       password: hashedPassword,
-//       employeeId,
-//       category, // Harus salah satu dari: Satpam, Apoteker, Cleaning Service, Staff
-//       role: "employee",
-//     });
-
-//     res.status(201).json({
-//       message: "Karyawan berhasil didaftarkan",
-//       data: {
-//         id: newUser._id,
-//         username: newUser.username,
-//         category: newUser.category,
-//       },
-//     });
-//   } catch (error) {
-//     // Menangkap error jika kategori tidak sesuai ENUM
-//     if (error.name === "ValidationError") {
-//       return res.status(400).json({
-//         message:
-//           "Kategori tidak valid. Pilih antara: Satpam, Apoteker, Cleaning Service, atau Staff",
-//       });
-//     }
-//     res.status(500).json({ message: error.message });
-//   }
-// };
-
 export const createEmployee = async (req, res) => {
   try {
     const { name, username, password, category, phone } = req.body;
@@ -478,16 +434,35 @@ export const deleteAttendance = async (req, res) => {
   try {
     const { id } = req.params;
 
-    const attendance = await Attendance.findById(id);
+    console.log("==========================================");
+    console.log("🗑️ DELETE ATTENDANCE REQUEST");
+    console.log("Attendance ID:", id);
+    console.log("Requested by:", req.user.name, `(${req.user.role})`);
+
+    const attendance = await Attendance.findById(id).populate(
+      "user",
+      "name employeeId"
+    );
 
     if (!attendance) {
+      console.log("❌ Attendance not found");
       return res.status(404).json({
         success: false,
         message: "Data presensi tidak ditemukan",
       });
     }
 
+    console.log("Found attendance:");
+    console.log("- User:", attendance.user.name);
+    console.log("- Employee ID:", attendance.user.employeeId);
+    console.log("- Date:", attendance.date);
+    console.log("- Clock In:", attendance.clockIn);
+    console.log("- Clock Out:", attendance.clockOut || "Not yet");
+
     await attendance.deleteOne();
+
+    console.log("✅ Attendance deleted successfully");
+    console.log("==========================================");
 
     res.status(200).json({
       success: true,

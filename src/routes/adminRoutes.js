@@ -15,6 +15,11 @@ import {
 } from "../controllers/adminController.js";
 import { protect, adminOnly } from "../middleware/authMiddleware.js";
 import { getTodayAttendance } from "../controllers/attendanceController.js";
+import {
+  getAllAttendances,
+  getAttendanceById,
+  getAttendancesByEmployee,
+} from "../controllers/adminAttendanceController.js";
 
 const router = express.Router();
 
@@ -37,6 +42,12 @@ router.put("/employees/:id", updateEmployee);
 router.delete("/employees/:id", deleteEmployee);
 router.put("/employees/:id/reset-password", resetPassword);
 
+router.delete("/attendance/:id", protect, adminOnly, deleteAttendance);
+
+// Attendance Management
+router.get("/attendances", protect, adminOnly, getAllAttendances);
+router.get("/attendances/:id", protect, adminOnly, getAttendanceById);
+router.get("/attendances/employee/:userId", protect, adminOnly, getAttendancesByEmployee);
 router.delete("/attendance/:id", protect, adminOnly, deleteAttendance);
 
 export default router;

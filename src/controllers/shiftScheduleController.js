@@ -358,3 +358,72 @@ export const getShiftSchedulesOverview = async (req, res) => {
     });
   }
 };
+
+export const getAllShiftSchedules = async (req, res) => {
+  try {
+    const { userId, shiftId, dayOfWeek } = req.query;
+
+    // Build filter object
+    const filter = {};
+    if (userId) filter.user = userId;
+    if (shiftId) filter.shift = shiftId;
+    if (dayOfWeek !== undefined) filter.dayOfWeek = parseInt(dayOfWeek);
+
+    const schedules = await ShiftSchedule.find(filter)
+      .populate({
+        path: "user",
+        select: "name employeeId category",
+        populate: {
+          path: "category",
+          select: "name prefix",
+        },
+      })
+      .populate("shift", "name startTime endTime")
+      .sort({ dayOfWeek: 1, user: 1 });
+
+    res.json({
+      success: true,
+      message: "Shift schedules fetched successfully",
+      data: schedules,
+    });
+  } catch (error) {
+    console.error("Error fetching all shift schedules:", error);
+    res.status(500).json({
+      success: false,
+      message: "Failed to fetch shift schedules",
+      error: error.message,
+    });
+  }
+};
+
+// Get schedules by shift ID
+export const getShiftSchedulesByShift = async (req, res) => {
+  try {
+    const { shiftId } = req.params;
+
+    const schedules = await ShiftSchedule.find({ shift: shiftId })
+      .populate({
+        path: "user",
+        select: "name employeeId category",
+        populate: {
+          path: "category",
+          select: "name prefix",
+        },
+      })
+      .populate("shift", "name startTime endTime")
+      .sort({ dayOfWeek: 1, user: 1 });
+
+    res.json({
+      success: true,
+      message: "Shift schedules by shift fetched successfully",
+      data: schedules,
+    });
+  } catch (error) {
+    console.error("Error fetching schedules by shift:", error);
+    res.status(500).json({
+      success: false,
+      message: "Failed to fetch schedules by shift",
+      error: error.message,
+    });
+  }
+};

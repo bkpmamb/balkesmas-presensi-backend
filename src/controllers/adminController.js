@@ -109,6 +109,7 @@ export const getAllEmployees = async (req, res) => {
     // 1. Ambil data dengan limit dan skip
     const employees = await User.find(searchFilter)
       .select("-password")
+      .populate("category", "name prefix")
       .sort({ createdAt: -1 })
       .skip(skip)
       .limit(limit);

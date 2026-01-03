@@ -26,6 +26,31 @@ export const getAllAttendance = async (req, res) => {
     const totalAttendance = await Attendance.countDocuments();
     const totalPages = Math.ceil(totalAttendance / limit);
 
+    const summary = {
+      totalAttendances: totalAttendance,
+      totalOnTime: await Attendance.countDocuments({
+        ...filter,
+        clockInStatus: "ontime",
+      }),
+      totalLate: await Attendance.countDocuments({
+        ...filter,
+        clockInStatus: "late",
+      }),
+      totalEarlyClockOut: await Attendance.countDocuments({
+        ...filter,
+        clockOutStatus: "early",
+      }),
+      totalNormalClockOut: await Attendance.countDocuments({
+        ...filter,
+        clockOutStatus: "normal",
+      }),
+      totalNotClockedOut: await Attendance.countDocuments({
+        ...filter,
+        clockOut: null,
+      }),
+      averageWorkMinutes: 0,
+    };
+
     res.status(200).json({
       message: "Seluruh riwayat absensi berhasil diambil",
       data: data,
@@ -37,6 +62,7 @@ export const getAllAttendance = async (req, res) => {
         hasNextPage: page < totalPages,
         hasPrevPage: page > 1,
       },
+      summary,
     });
   } catch (error) {
     res.status(500).json({ message: error.message });

@@ -1,4 +1,4 @@
-import Attendace from "../models/Attendance.js";
+import Attendance from "../models/Attendance.js";
 import User from "../models/User.js";
 import Shift from "../models/Shift.js";
 

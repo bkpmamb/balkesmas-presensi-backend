@@ -45,8 +45,6 @@ router.put("/employees/:id", updateEmployee);
 router.delete("/employees/:id", deleteEmployee);
 router.put("/employees/:id/reset-password", resetPassword);
 
-router.delete("/attendance/:id", protect, adminOnly, deleteAttendance);
-
 // Attendance Management
 router.get("/attendances", protect, adminOnly, getAllAttendances);
 router.get("/attendances/:id", protect, adminOnly, getAttendanceById);

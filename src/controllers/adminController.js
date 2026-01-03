@@ -9,23 +9,119 @@ import { generateEmployeeId } from "../utils/generateEmployeeId.js";
 
 export const getAllAttendance = async (req, res) => {
   try {
-    // Ambil parameter query, default: halaman 1, limit 10 data
+    // Ambil parameter query
     const page = parseInt(req.query.page) || 1;
     const limit = parseInt(req.query.limit) || 10;
     const skip = (page - 1) * limit;
 
-    // 1. Ambil data dengan pagination
-    const data = await Attendance.find()
+    // FIX: Tambahkan filter object (kosong = ambil semua)
+    const {
+      userId,
+      shiftId,
+      startDate,
+      endDate,
+      clockInStatus,
+      clockOutStatus,
+      search,
+    } = req.query;
+
+    // Build filter object
+    const filter = {};
+
+    // Filter by user
+    if (userId) {
+      filter.user = userId;
+    }
+
+    // Filter by shift
+    if (shiftId) {
+      filter.shift = shiftId;
+    }
+
+    // Filter by date range
+    if (startDate || endDate) {
+      filter.date = {};
+      if (startDate) {
+        filter.date.$gte = new Date(startDate);
+      }
+      if (endDate) {
+        const end = new Date(endDate);
+        end.setHours(23, 59, 59, 999);
+        filter.date.$lte = end;
+      }
+    }
+
+    // Filter by clock in status
+    if (clockInStatus) {
+      filter.clockInStatus = clockInStatus;
+    }
+
+    // Filter by clock out status
+    if (clockOutStatus) {
+      filter.clockOutStatus = clockOutStatus;
+    }
+
+    // Search by employee name
+    if (search) {
+      const users = await User.find({
+        role: "employee",
+        $or: [
+          { name: { $regex: search, $options: "i" } },
+          { employeeId: { $regex: search, $options: "i" } },
+        ],
+      }).select("_id");
+
+      const userIds = users.map((u) => u._id);
+
+      if (userIds.length > 0) {
+        filter.user = { $in: userIds };
+      } else {
+        // No users found, return empty result
+        return res.status(200).json({
+          success: true,
+          message: "Tidak ada data presensi ditemukan",
+          data: [],
+          pagination: {
+            totalData: 0,
+            totalPages: 0,
+            currentPage: page,
+            limit: limit,
+            hasNextPage: false,
+            hasPrevPage: false,
+          },
+          summary: {
+            totalAttendances: 0,
+            totalOnTime: 0,
+            totalLate: 0,
+            totalEarlyClockOut: 0,
+            totalNormalClockOut: 0,
+            totalNotClockedOut: 0,
+            averageWorkMinutes: 0,
+          },
+        });
+      }
+    }
+
+    // 1. Ambil data dengan pagination dan filter
+    const data = await Attendance.find(filter)
       .populate("user", "name employeeId category")
-      .populate("shift", "name")
-      .sort({ clockIn: -1 }) // Terbaru di atas
+      .populate({
+        path: "user",
+        populate: {
+          path: "category",
+          select: "name prefix",
+        },
+      })
+      .populate("shift", "name startTime endTime")
+      .sort({ clockIn: -1 })
       .skip(skip)
       .limit(limit);
 
-    // 2. Hitung total record untuk info di frontend
-    const totalAttendance = await Attendance.countDocuments();
+    // 2. Hitung total record untuk pagination
+    const totalAttendance = await Attendance.countDocuments(filter);
     const totalPages = Math.ceil(totalAttendance / limit);
 
+    // 3. Hitung summary statistics
     const summary = {
       totalAttendances: totalAttendance,
       totalOnTime: await Attendance.countDocuments({
@@ -51,7 +147,18 @@ export const getAllAttendance = async (req, res) => {
       averageWorkMinutes: 0,
     };
 
+    // Calculate average work minutes
+    if (totalAttendance > 0) {
+      const allAttendances = await Attendance.find(filter).select("workMinutes");
+      const totalWorkMinutes = allAttendances.reduce(
+        (sum, a) => sum + (a.workMinutes || 0),
+        0
+      );
+      summary.averageWorkMinutes = Math.round(totalWorkMinutes / totalAttendance);
+    }
+
     res.status(200).json({
+      success: true,
       message: "Seluruh riwayat absensi berhasil diambil",
       data: data,
       pagination: {
@@ -65,7 +172,12 @@ export const getAllAttendance = async (req, res) => {
       summary,
     });
   } catch (error) {
-    res.status(500).json({ message: error.message });
+    console.error("❌ getAllAttendance Error:", error);
+    res.status(500).json({
+      success: false,
+      message: "Gagal mengambil data presensi",
+      error: error.message,
+    });
   }
 };
 

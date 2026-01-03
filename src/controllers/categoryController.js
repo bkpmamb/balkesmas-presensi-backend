@@ -5,7 +5,7 @@ import Shift from "../models/Shift.js";
 // @desc    Get all categories
 // @route   GET /api/admin/categories
 // @access  Private/Admin
-export const getAllCategories = async () => {
+export const getAllCategories = async (req, res) => {
   try {
     const page = parseInt(req.query.page) || 1;
     const limit = parseInt(req.query.limit) || 10;
@@ -21,8 +21,8 @@ export const getAllCategories = async () => {
         }
       : {};
 
-    const categories = (await Category.find(searchFilter))
-      .toSorted({ created: -1 })
+    const categories = await Category.find(searchFilter)
+      .sort({ createdAt: -1 })
       .skip(skip)
       .limit(limit);
 
